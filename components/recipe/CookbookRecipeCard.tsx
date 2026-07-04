@@ -6,7 +6,6 @@ import { DietMarker } from "@/components/recipe/DietMarker";
 import { SoupHeroIllustration } from "@/components/recipe/SoupHeroIllustration";
 import type { RecipeId } from "@/features/recipe/data/homemadeRecipe";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { type ColorPalette } from "@/theme/colors";
 import type { DietType } from "@/types/recipe";
 import { fontFamily } from "@/theme/typography";
 import { radius, spacing } from "@/theme/spacing";
@@ -79,28 +78,26 @@ export function CookbookRecipeCard({
             <AppText style={[styles.infoBtnLabel, { color: colors.text }]}>i</AppText>
           </Pressable>
         ) : null}
+        <ImageVignette gradientId={`card-vignette-${recipeId}`} />
         <View pointerEvents="none" style={styles.bottomOverlay}>
-          <ImageVignette gradientId={`card-vignette-${recipeId}`} />
           <View style={styles.overlayContent}>
             <View style={styles.titleRow}>
               <View style={styles.titleWithMarker}>
-                <AppText variant="heading" style={styles.recipeTitle}>
+                <AppText variant="heading" style={[styles.recipeTitle, styles.overlayText]}>
                   {title}
                 </AppText>
                 {!hasBadges ? <DietMarker dietType={dietType} /> : null}
               </View>
               <View style={styles.timeRow}>
-                <ClockIcon color={colors.muted} />
-                <AppText muted style={styles.timeText}>
-                  {timeLabel}
-                </AppText>
+                <ClockIcon color="#FFFFFF" />
+                <AppText style={[styles.timeText, styles.overlayText]}>{timeLabel}</AppText>
               </View>
             </View>
             {hasBadges ? (
               <View style={styles.metaRow}>
                 <DietMarker dietType={dietType} />
                 {badges.map((badge) => (
-                  <MetaPill key={badge} label={badge} colors={colors} />
+                  <MetaPill key={badge} label={badge} />
                 ))}
               </View>
             ) : null}
@@ -113,13 +110,17 @@ export function CookbookRecipeCard({
 
 function ImageVignette({ gradientId }: { gradientId: string }) {
   return (
-    <Svg pointerEvents="none" style={StyleSheet.absoluteFill} preserveAspectRatio="none">
+    <Svg pointerEvents="none" style={styles.vignette} preserveAspectRatio="none">
       <Defs>
         <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0" />
-          <Stop offset="0.38" stopColor="#FFFFFF" stopOpacity="0.68" />
-          <Stop offset="0.72" stopColor="#FFFFFF" stopOpacity="1" />
-          <Stop offset="1" stopColor="#FFFFFF" stopOpacity="1" />
+          <Stop offset="0" stopColor="#000000" stopOpacity="0" />
+          <Stop offset="0.42" stopColor="#000000" stopOpacity="0" />
+          <Stop offset="0.56" stopColor="#000000" stopOpacity="0.18" />
+          <Stop offset="0.68" stopColor="#000000" stopOpacity="0.4" />
+          <Stop offset="0.78" stopColor="#000000" stopOpacity="0.62" />
+          <Stop offset="0.88" stopColor="#000000" stopOpacity="0.82" />
+          <Stop offset="0.96" stopColor="#000000" stopOpacity="0.94" />
+          <Stop offset="1" stopColor="#000000" stopOpacity="1" />
         </LinearGradient>
       </Defs>
       <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${gradientId})`} />
@@ -136,10 +137,10 @@ function ClockIcon({ color }: { color: string }) {
   );
 }
 
-function MetaPill({ label, colors }: { label: string; colors: ColorPalette }) {
+function MetaPill({ label }: { label: string }) {
   return (
-    <View style={[styles.pill, { borderColor: colors.border, backgroundColor: "rgba(255,255,255,0.92)" }]}>
-      <AppText style={[styles.pillText, { color: colors.muted }]}>{label}</AppText>
+    <View style={styles.pill}>
+      <AppText style={[styles.pillText, styles.overlayText]}>{label}</AppText>
     </View>
   );
 }
@@ -159,12 +160,19 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative"
   },
+  vignette: {
+    ...StyleSheet.absoluteFill,
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
   bottomOverlay: {
     bottom: 0,
     left: 0,
     paddingBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
-    paddingTop: 52,
     position: "absolute",
     right: 0
   },
@@ -224,6 +232,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 18
   },
+  overlayText: {
+    color: "#FFFFFF"
+  },
   timeRow: {
     alignItems: "center",
     flexDirection: "row",
@@ -243,6 +254,8 @@ const styles = StyleSheet.create({
   },
   pill: {
     alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderColor: "rgba(255,255,255,0.32)",
     borderRadius: radius.pill,
     borderWidth: 1,
     paddingHorizontal: 6,
