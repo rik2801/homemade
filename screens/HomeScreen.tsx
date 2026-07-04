@@ -1,13 +1,29 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { AppText } from "@/components/primitives/AppText";
 import { CookbookRecipeCard } from "@/components/recipe/CookbookRecipeCard";
+import { CookbookSearchBar, type CookbookSortMode } from "@/components/recipe/CookbookSearchBar";
 import { COOKBOOK_ITEMS } from "@/features/recipe/data/homemadeRecipe";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
 import { fontFamily } from "@/theme/typography";
 import { layout, spacing } from "@/theme/spacing";
+
+const CHEF_RECOMMENDED_ORDER = new Map(COOKBOOK_ITEMS.map((item, index) => [item.id, index]));
+
+function sortCookbookItems<T extends (typeof COOKBOOK_ITEMS)[number]>(items: readonly T[], mode: CookbookSortMode) {
+  const list = [...items];
+  if (mode === "a-z") {
+    return list.sort((a, b) => a.title.localeCompare(b.title));
+  }
+  if (mode === "z-a") {
+    return list.sort((a, b) => b.title.localeCompare(a.title));
+  }
+  return list.sort(
+    (a, b) => (CHEF_RECOMMENDED_ORDER.get(a.id) ?? 0) - (CHEF_RECOMMENDED_ORDER.get(b.id) ?? 0)
+  );
+}
 
 function audienceReason(cookingFor: string) {
   if (cookingFor === "Couple") return "Good for two";
@@ -22,6 +38,16 @@ export function HomeScreen() {
   const openRecipe = useAppStore((state) => state.openRecipe);
   const cookingFor = useAppStore((state) => state.cookingFor);
   const [reasonSheetVisible, setReasonSheetVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortMode, setSortMode] = useState<CookbookSortMode>("chef-recommended");
+
+  const visibleItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const filtered = query
+      ? COOKBOOK_ITEMS.filter((item) => item.title.toLowerCase().includes(query))
+      : COOKBOOK_ITEMS;
+    return sortCookbookItems(filtered, sortMode);
+  }, [searchQuery, sortMode]);
 
   const reasons = [
     "Fits your dietary goals",
@@ -40,8 +66,15 @@ export function HomeScreen() {
           Cookbook
         </AppText>
 
+        <CookbookSearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          sortMode={sortMode}
+          onSortChange={setSortMode}
+        />
+
         <View style={styles.cards}>
-          {COOKBOOK_ITEMS.map((item) => (
+          {visibleItems.map((item) => (
             <CookbookRecipeCard
               key={item.id}
               recipeId={item.id}
@@ -91,7 +124,8 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 18,
     letterSpacing: -0.36,
-    lineHeight: 22
+    lineHeight: 22,
+    marginBottom: -4
   },
   cards: {
     gap: spacing.lg
