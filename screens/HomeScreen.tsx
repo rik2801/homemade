@@ -84,7 +84,7 @@ export function HomeScreen() {
               badges={item.badges}
               featured={item.featured}
               onOpenReasons={item.featured ? () => setReasonSheetVisible(true) : undefined}
-              onStartCooking={() => openRecipe(item.id, { showDetail: true })}
+              onPress={() => openRecipe(item.id, { showDetail: true })}
             />
           ))}
         </View>

@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { Pressable, StyleSheet, View } from "react-native";
-import Svg, { Circle, Path } from "react-native-svg";
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 import { AppText } from "@/components/primitives/AppText";
 import { DietMarker } from "@/components/recipe/DietMarker";
 import { SoupHeroIllustration } from "@/components/recipe/SoupHeroIllustration";
@@ -11,6 +11,8 @@ import type { DietType } from "@/types/recipe";
 import { fontFamily } from "@/theme/typography";
 import { radius, spacing } from "@/theme/spacing";
 
+const CARD_IMAGE_HEIGHT = 274;
+
 type CookbookRecipeCardProps = {
   recipeId: RecipeId;
   title: string;
@@ -18,7 +20,7 @@ type CookbookRecipeCardProps = {
   dietType: DietType;
   badges: readonly string[];
   featured?: boolean;
-  onStartCooking: () => void;
+  onPress: () => void;
   onOpenReasons?: () => void;
 };
 
@@ -29,15 +31,15 @@ export function CookbookRecipeCard({
   dietType,
   badges,
   featured = false,
-  onStartCooking,
+  onPress,
   onOpenReasons
 }: CookbookRecipeCardProps) {
   const { colors } = useAppTheme();
   const hasBadges = badges.length > 0;
 
-  async function handleStartCooking() {
+  async function handlePress() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onStartCooking();
+    onPress();
   }
 
   async function handleOpenReasons() {
@@ -46,18 +48,18 @@ export function CookbookRecipeCard({
   }
 
   return (
-    <View
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${title} recipe`}
+      onPress={handlePress}
       style={[
         styles.card,
         featured ? styles.cardFeatured : styles.cardStandard,
-        {
-          backgroundColor: colors.surface,
-          borderColor: featured ? colors.brand : colors.border
-        }
+        { borderColor: featured ? colors.brand : colors.border }
       ]}
     >
       <View style={styles.imageWrap}>
-        <SoupHeroIllustration recipeId={recipeId} />
+        <SoupHeroIllustration recipeId={recipeId} height={CARD_IMAGE_HEIGHT} />
         {featured ? (
           <View style={[styles.recommendedBadge, { backgroundColor: colors.greenSoft, borderColor: "#155A19" }]}>
             <AppText style={[styles.recommendedText, { color: "#155A19" }]}>Recommended</AppText>
@@ -68,49 +70,60 @@ export function CookbookRecipeCard({
             accessibilityRole="button"
             accessibilityLabel="Why this recipe was recommended"
             hitSlop={8}
-            onPress={handleOpenReasons}
+            onPress={(event) => {
+              event.stopPropagation();
+              handleOpenReasons();
+            }}
             style={[styles.infoBtn, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
           >
             <AppText style={[styles.infoBtnLabel, { color: colors.text }]}>i</AppText>
           </Pressable>
         ) : null}
-      </View>
-      <View style={styles.cardBody}>
-        <View style={styles.titleBlock}>
-          <View style={styles.titleRow}>
-            <View style={styles.titleWithMarker}>
-              <AppText variant="heading" style={styles.recipeTitle}>
-                {title}
-              </AppText>
-              {!hasBadges ? <DietMarker dietType={dietType} /> : null}
+        <View pointerEvents="none" style={styles.bottomOverlay}>
+          <ImageVignette gradientId={`card-vignette-${recipeId}`} />
+          <View style={styles.overlayContent}>
+            <View style={styles.titleRow}>
+              <View style={styles.titleWithMarker}>
+                <AppText variant="heading" style={styles.recipeTitle}>
+                  {title}
+                </AppText>
+                {!hasBadges ? <DietMarker dietType={dietType} /> : null}
+              </View>
+              <View style={styles.timeRow}>
+                <ClockIcon color={colors.muted} />
+                <AppText muted style={styles.timeText}>
+                  {timeLabel}
+                </AppText>
+              </View>
             </View>
-            <View style={styles.timeRow}>
-              <ClockIcon color={colors.muted} />
-              <AppText muted style={styles.timeText}>
-                {timeLabel}
-              </AppText>
-            </View>
+            {hasBadges ? (
+              <View style={styles.metaRow}>
+                <DietMarker dietType={dietType} />
+                {badges.map((badge) => (
+                  <MetaPill key={badge} label={badge} colors={colors} />
+                ))}
+              </View>
+            ) : null}
           </View>
         </View>
-        {hasBadges ? (
-          <View style={styles.pillsBlock}>
-            <View style={styles.metaRow}>
-              <DietMarker dietType={dietType} />
-              {badges.map((badge) => (
-                <MetaPill key={badge} label={badge} colors={colors} />
-              ))}
-            </View>
-          </View>
-        ) : null}
-        <Pressable
-          accessibilityRole="button"
-          onPress={handleStartCooking}
-          style={[styles.primaryBtn, { backgroundColor: colors.brand }]}
-        >
-          <AppText style={[styles.primaryBtnLabel, { color: colors.brandOnBrand }]}>Start cooking</AppText>
-        </Pressable>
       </View>
-    </View>
+    </Pressable>
+  );
+}
+
+function ImageVignette({ gradientId }: { gradientId: string }) {
+  return (
+    <Svg pointerEvents="none" style={StyleSheet.absoluteFill} preserveAspectRatio="none">
+      <Defs>
+        <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0" />
+          <Stop offset="0.38" stopColor="#FFFFFF" stopOpacity="0.68" />
+          <Stop offset="0.72" stopColor="#FFFFFF" stopOpacity="1" />
+          <Stop offset="1" stopColor="#FFFFFF" stopOpacity="1" />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${gradientId})`} />
+    </Svg>
   );
 }
 
@@ -125,7 +138,7 @@ function ClockIcon({ color }: { color: string }) {
 
 function MetaPill({ label, colors }: { label: string; colors: ColorPalette }) {
   return (
-    <View style={[styles.pill, { borderColor: colors.border, backgroundColor: colors.canvas }]}>
+    <View style={[styles.pill, { borderColor: colors.border, backgroundColor: "rgba(255,255,255,0.92)" }]}>
       <AppText style={[styles.pillText, { color: colors.muted }]}>{label}</AppText>
     </View>
   );
@@ -142,6 +155,22 @@ const styles = StyleSheet.create({
   cardStandard: {
     borderWidth: 1
   },
+  imageWrap: {
+    overflow: "hidden",
+    position: "relative"
+  },
+  bottomOverlay: {
+    bottom: 0,
+    left: 0,
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 52,
+    position: "absolute",
+    right: 0
+  },
+  overlayContent: {
+    position: "relative"
+  },
   recommendedBadge: {
     borderRadius: radius.pill,
     borderWidth: 1,
@@ -150,7 +179,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     position: "absolute",
     top: spacing.sm,
-    zIndex: 1
+    zIndex: 2
   },
   recommendedText: {
     fontFamily,
@@ -158,10 +187,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.4,
     textTransform: "uppercase"
-  },
-  imageWrap: {
-    overflow: "hidden",
-    position: "relative"
   },
   infoBtn: {
     alignItems: "center",
@@ -172,25 +197,14 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: spacing.sm,
     top: spacing.sm,
-    width: 21
+    width: 21,
+    zIndex: 2
   },
   infoBtnLabel: {
     fontFamily,
     fontSize: 10,
     fontWeight: "600",
     lineHeight: 10
-  },
-  cardBody: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-    paddingTop: spacing.md
-  },
-  titleBlock: {
-    paddingBottom: 17,
-    paddingTop: 11
-  },
-  pillsBlock: {
-    paddingBottom: 13
   },
   titleRow: {
     alignItems: "center",
@@ -224,7 +238,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6
+    gap: 6,
+    marginTop: 10
   },
   pill: {
     alignSelf: "flex-start",
@@ -238,18 +253,5 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "500",
     lineHeight: 12
-  },
-  primaryBtn: {
-    alignItems: "center",
-    borderRadius: radius.md,
-    justifyContent: "center",
-    marginTop: spacing.xs,
-    minHeight: 40
-  },
-  primaryBtnLabel: {
-    fontFamily,
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 16
   }
 });
