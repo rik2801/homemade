@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Homemade",
+    "slug": "homemade-native-challenge",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "homemade",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.homemade.challenge"
+    },
+    "android": {
+      "package": "com.homemade.challenge",
+      "adaptiveIcon": {
+        "backgroundColor": "#F8F1E4"
+      }
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "homemade-native-challenge",
+  "private": true,
+  "version": "0.1.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "postinstall": "node scripts/patch-expo-modules-jsi.cjs",
+    "start": "expo start",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shopify/flash-list": "2.0.2",
+    "@shopify/react-native-skia": "2.6.2",
+    "expo": "57.0.2",
+    "expo-blur": "57.0.0",
+    "expo-constants": "57.0.3",
+    "expo-dev-client": "~57.0.5",
+    "expo-haptics": "57.0.0",
+    "expo-linking": "57.0.1",
+    "expo-router": "57.0.3",
+    "expo-status-bar": "~57.0.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-reanimated": "4.5.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
+    "react-native-worklets": "0.10.0",
+    "zustand": "5.0.14"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "typescript": "~6.0.3"
+  }
+}
