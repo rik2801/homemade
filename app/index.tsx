@@ -36,7 +36,10 @@ export default function AppShell() {
         {activeTab === "archie" ? (
           <View style={styles.archieBody}>
             <ArchieScreen />
-            <View style={[styles.archieComposerSlot, { paddingBottom: archieComposerBottom }]}>
+            <View
+              pointerEvents="box-none"
+              style={[styles.archieComposerSlot, { paddingBottom: archieComposerBottom }]}
+            >
               <ArchieComposer />
             </View>
           </View>

@@ -58,7 +58,7 @@ function RecipeListView() {
                 <AppText variant="heading" style={styles.title}>
                   {item.title}
                 </AppText>
-                {item.badges.length === 0 ? <DietMarker dietType={item.dietType} /> : null}
+                <DietMarker dietType={item.dietType} />
               </View>
               <View style={styles.timeRow}>
                 <ClockIcon color={colors.muted} />
@@ -68,7 +68,6 @@ function RecipeListView() {
               </View>
               {item.badges.length > 0 ? (
                 <View style={styles.badges}>
-                  <DietMarker dietType={item.dietType} />
                   {item.badges.map((badge) => (
                     <View
                       key={badge}

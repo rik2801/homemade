@@ -96,6 +96,7 @@ export type AssistantContext = "recipe" | "conversation";
 export type AssistantPhase =
   | "idle"
   | "pick_recipe"
+  | "pick_ingredient"
   | "awaiting_substitute"
   | "loading"
   | "suggestion"

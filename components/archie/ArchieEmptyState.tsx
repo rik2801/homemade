@@ -94,16 +94,16 @@ const styles = StyleSheet.create({
   },
   headline: {
     fontFamily,
-    fontSize: 22,
+    fontSize: 15,
     fontWeight: "700",
-    letterSpacing: -0.4,
-    lineHeight: 28,
+    letterSpacing: -0.3,
+    lineHeight: 20,
     textAlign: "center"
   },
   subtext: {
     fontFamily,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 9,
+    lineHeight: 13,
     maxWidth: 280,
     textAlign: "center"
   },
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     justifyContent: "center",
-    minHeight: 52,
+    minHeight: 44,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
     shadowOffset: { width: 0, height: 4 },
@@ -130,10 +130,10 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontFamily,
-    fontSize: 12,
+    fontSize: 8,
     fontWeight: "400",
     letterSpacing: -0.1,
-    lineHeight: 16,
+    lineHeight: 11,
     textAlign: "center"
   }
 });

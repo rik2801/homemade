@@ -53,6 +53,7 @@ type AppState = {
   userMessage: string;
   unknownHint: string | null;
   recipeConfirmation: string;
+  ingredientConfirmation: string;
   targetRecipeId: string | null;
   pendingSuggestion: PendingSuggestion | null;
   progressStep: number;
@@ -80,7 +81,9 @@ type AppState = {
   toggleFallbackMode: () => void;
   selectIngredientForSwap: (ingredientId: string) => void;
   startSwap: (ingredientId: string, fromRecipe?: boolean) => void;
+  startSwapIntent: (message?: string) => void;
   selectRecipeForSwap: (recipeId: string) => void;
+  selectIngredientForConversation: (ingredientId: string) => void;
   selectUserSubstitute: (userHas: string) => void;
   requestComposerFocus: () => void;
   setArchieComposerDraft: (text: string) => void;
@@ -151,6 +154,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   userMessage: "",
   unknownHint: null,
   recipeConfirmation: "",
+  ingredientConfirmation: "",
   targetRecipeId: null,
   pendingSuggestion: null,
   progressStep: 0,
@@ -220,6 +224,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().startSwap(ingredientId, true);
   },
 
+  startSwapIntent: (message = "Swap an ingredient") => {
+    const currentTab = get().activeTab;
+
+    set({
+      ...resetSwapConversation(),
+      userMessage: message,
+      unknownHint: null,
+      recipeConfirmation: "",
+      ingredientConfirmation: "",
+      selectedIngredientId: null,
+      targetRecipeId: null,
+      lastApplied: null,
+      assistantContext: "conversation",
+      assistantPhase: "pick_recipe",
+      activeTab: "archie",
+      returnTab: currentTab !== "archie" ? currentTab : get().returnTab
+    });
+  },
+
   startSwap: (ingredientId, fromRecipe = false) => {
     if (get().assistantPhase === "loading") return;
 
@@ -236,6 +259,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       userMessage: userMessageFor(ingredient),
       unknownHint: null,
       recipeConfirmation: "",
+      ingredientConfirmation: "",
       lastApplied: null,
       assistantContext: fromRecipe ? ("recipe" as AssistantContext) : ("conversation" as AssistantContext),
       activeTab: "archie" as TabName,
@@ -260,12 +284,41 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   selectRecipeForSwap: (recipeId) => {
     const recipe = getRecipeById(recipeId);
-    if (!recipe || !get().selectedIngredientId) return;
+    if (!recipe) return;
+
+    const selectedIngredientId = get().selectedIngredientId;
+    const appliedSubstitutions = isSwapDemoRecipe(recipeId) ? get().appliedSubstitutions : {};
+
+    if (!selectedIngredientId) {
+      set({
+        ...loadRecipeState(recipe, appliedSubstitutions),
+        targetRecipeId: recipeId,
+        recipeConfirmation: recipe.title,
+        ingredientConfirmation: "",
+        assistantPhase: "pick_ingredient",
+        ...resetSwapConversation()
+      });
+      return;
+    }
 
     set({
-      ...loadRecipeState(recipe, isSwapDemoRecipe(recipeId) ? get().appliedSubstitutions : {}),
+      ...loadRecipeState(recipe, appliedSubstitutions),
       targetRecipeId: recipeId,
-      recipeConfirmation: `Use ${recipe.title}.`,
+      recipeConfirmation: recipe.title,
+      ingredientConfirmation: "",
+      assistantPhase: "awaiting_substitute",
+      ...resetSwapConversation()
+    });
+  },
+
+  selectIngredientForConversation: (ingredientId) => {
+    const { recipe } = get();
+    const ingredient = findIngredientById(recipe, ingredientId);
+    if (!ingredient || get().hasSubstitution(ingredientId)) return;
+
+    set({
+      selectedIngredientId: ingredientId,
+      ingredientConfirmation: ingredient.label,
       assistantPhase: "awaiting_substitute",
       ...resetSwapConversation()
     });
@@ -304,6 +357,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         assistantPhase: "idle",
         userMessage: "",
         recipeConfirmation: "",
+        ingredientConfirmation: "",
         targetRecipeId: null,
         assistantContext: "conversation",
         selectedIngredientId: null,
@@ -316,7 +370,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       ...resetSwapConversation(),
       assistantPhase: "pick_recipe",
       targetRecipeId: null,
-      recipeConfirmation: ""
+      recipeConfirmation: "",
+      ingredientConfirmation: ""
     });
   },
 
@@ -408,7 +463,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    if (phase === "loading" || phase === "pick_recipe") return;
+    if (phase === "loading" || phase === "pick_recipe" || phase === "pick_ingredient") return;
+
+    const normalized = text.toLowerCase();
+    const isSwapIntent =
+      normalized === "swap an ingredient" ||
+      normalized === "swap ingredient" ||
+      normalized.includes("swap an ingredient") ||
+      normalized.includes("replace an ingredient");
+
+    if (isSwapIntent) {
+      get().startSwapIntent(text);
+      return;
+    }
 
     const { recipe } = get();
     const ingredientId = resolveIngredientIdFromText(recipe, text);
@@ -418,6 +485,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         unknownHint: UNKNOWN_INGREDIENT_MSG,
         assistantPhase: "idle",
         recipeConfirmation: "",
+        ingredientConfirmation: "",
         pendingSuggestion: null,
         userHasSubstitute: null,
         userSubstituteReply: null

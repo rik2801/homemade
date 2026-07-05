@@ -9,12 +9,12 @@ import {
   archieEmptyStateDefaults
 } from "@/components/archie/ArchieEmptyState";
 import { ArchieProgressCard } from "@/components/archie/ArchieProgressCard";
+import { IngredientPickerCards } from "@/components/archie/IngredientPickerCards";
 import { RecipePickerCards } from "@/components/archie/RecipePickerCards";
 import { SubstitutePromptChips } from "@/components/archie/SubstitutePromptChips";
 import { AppText } from "@/components/primitives/AppText";
 import { SwapRecommendationCard } from "@/components/swap/SwapRecommendationCard";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { findIngredientIdByLabel } from "@/lib/swapFlow";
 import { runSwapGeneration } from "@/services/assistantService";
 import { useAppStore } from "@/store/useAppStore";
 import { fontFamily } from "@/theme/typography";
@@ -24,11 +24,11 @@ export function ArchieScreen() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
-  const recipe = useAppStore((state) => state.recipe);
   const assistantPhase = useAppStore((state) => state.assistantPhase);
   const userMessage = useAppStore((state) => state.userMessage);
   const unknownHint = useAppStore((state) => state.unknownHint);
   const recipeConfirmation = useAppStore((state) => state.recipeConfirmation);
+  const ingredientConfirmation = useAppStore((state) => state.ingredientConfirmation);
   const userSubstituteReply = useAppStore((state) => state.userSubstituteReply);
   const pendingSuggestion = useAppStore((state) => state.pendingSuggestion);
   const progressStep = useAppStore((state) => state.progressStep);
@@ -39,7 +39,7 @@ export function ArchieScreen() {
   const allergies = useAppStore((state) => state.allergies);
   const lastApplied = useAppStore((state) => state.lastApplied);
   const applyPhase = useAppStore((state) => state.applyPhase);
-  const startSwap = useAppStore((state) => state.startSwap);
+  const startSwapIntent = useAppStore((state) => state.startSwapIntent);
   const submitAssistantInput = useAppStore((state) => state.submitAssistantInput);
   const setProgressStep = useAppStore((state) => state.setProgressStep);
   const setPendingSuggestion = useAppStore((state) => state.setPendingSuggestion);
@@ -64,6 +64,7 @@ export function ArchieScreen() {
     applyPhase,
     pendingSuggestion,
     recipeConfirmation,
+    ingredientConfirmation,
     showWelcome,
     unknownHint,
     userMessage,
@@ -121,18 +122,31 @@ export function ArchieScreen() {
     []
   );
 
+  const showRecipeStep =
+    assistantPhase === "pick_recipe" ||
+    Boolean(recipeConfirmation) ||
+    assistantPhase === "pick_ingredient" ||
+    Boolean(ingredientConfirmation) ||
+    assistantPhase === "awaiting_substitute" ||
+    assistantPhase === "loading" ||
+    assistantPhase === "suggestion" ||
+    assistantPhase === "applied";
+
+  const showIngredientStep = assistantPhase === "pick_ingredient" || Boolean(ingredientConfirmation);
+
+  const showSubstituteStep =
+    assistantPhase === "awaiting_substitute" ||
+    Boolean(userSubstituteReply) ||
+    assistantPhase === "loading" ||
+    assistantPhase === "suggestion" ||
+    assistantPhase === "applied";
+
   const quickActions = useMemo(
     () => [
       {
         id: "swap",
         label: "Swap an ingredient",
-        onPress: () =>
-          runQuickAction(() => {
-            const ingredientId = findIngredientIdByLabel(recipe, "heavy cream");
-            if (ingredientId) {
-              startSwap(ingredientId, false);
-            }
-          })
+        onPress: () => runQuickAction(() => startSwapIntent())
       },
       {
         id: "sodium",
@@ -151,7 +165,7 @@ export function ArchieScreen() {
         onPress: () => runQuickAction(() => submitAssistantInput("Use what I have in my pantry"))
       }
     ],
-    [recipe, runQuickAction, startSwap, submitAssistantInput]
+    [runQuickAction, startSwapIntent, submitAssistantInput]
   );
 
   const emptyStyle = useAnimatedStyle(() => ({
@@ -207,27 +221,42 @@ export function ArchieScreen() {
             </View>
           ) : null}
 
+          {showRecipeStep ? (
+            <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
+              <AppText muted style={styles.intro}>
+                Which recipe should I use for this swap?
+              </AppText>
+              {assistantPhase === "pick_recipe" ? <RecipePickerCards /> : null}
+            </View>
+          ) : null}
+
           {recipeConfirmation ? (
             <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.brand }]}>
               <AppText style={[styles.userText, { color: colors.brandOnBrand }]}>{recipeConfirmation}</AppText>
             </View>
           ) : null}
 
-          {assistantPhase === "pick_recipe" ? (
+          {showIngredientStep ? (
             <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
               <AppText muted style={styles.intro}>
-                Which recipe should I use for this swap?
+                Which ingredient would you like to swap?
               </AppText>
-              <RecipePickerCards />
+              {assistantPhase === "pick_ingredient" ? <IngredientPickerCards /> : null}
             </View>
           ) : null}
 
-          {assistantPhase === "awaiting_substitute" ? (
+          {ingredientConfirmation ? (
+            <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.brand }]}>
+              <AppText style={[styles.userText, { color: colors.brandOnBrand }]}>{ingredientConfirmation}</AppText>
+            </View>
+          ) : null}
+
+          {showSubstituteStep ? (
             <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
               <AppText muted style={styles.intro}>
                 What do you have available instead?
               </AppText>
-              <SubstitutePromptChips />
+              {assistantPhase === "awaiting_substitute" ? <SubstitutePromptChips /> : null}
             </View>
           ) : null}
 
@@ -301,13 +330,13 @@ const styles = StyleSheet.create({
   },
   intro: {
     fontFamily,
-    fontSize: 15,
-    lineHeight: 22
+    fontSize: 11,
+    lineHeight: 16
   },
   userText: {
     fontFamily,
-    fontSize: 15,
-    lineHeight: 22
+    fontSize: 11,
+    lineHeight: 16
   },
   appliedCard: {
     borderRadius: radius.lg,
@@ -317,7 +346,7 @@ const styles = StyleSheet.create({
   },
   appliedTitle: {
     fontFamily,
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: "700"
   }
 });

@@ -81,13 +81,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily,
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: "600"
   },
   meta: {
     fontFamily,
-    fontSize: 11,
-    lineHeight: 16
+    fontSize: 8,
+    lineHeight: 11
   },
   soon: {
     borderRadius: radius.pill,
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   },
   soonText: {
     fontFamily,
-    fontSize: 10,
+    fontSize: 7,
     fontWeight: "600",
     letterSpacing: 0.4,
     textTransform: "uppercase"

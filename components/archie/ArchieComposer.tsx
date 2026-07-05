@@ -88,7 +88,10 @@ export function ArchieComposer() {
     inputRef.current?.focus();
   }, [composerFocusToken]);
 
-  const disabled = assistantPhase === "loading" || assistantPhase === "pick_recipe";
+  const disabled =
+    assistantPhase === "loading" ||
+    assistantPhase === "pick_recipe" ||
+    assistantPhase === "pick_ingredient";
   const canSend = text.trim().length > 0 && !disabled;
   const placeholder =
     assistantPhase === "awaiting_substitute" ? "What do you have instead?" : "Describe the dish...";
