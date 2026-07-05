@@ -180,7 +180,6 @@ export function ArchieScreen() {
         <ArchieEmptyState
           headline={archieEmptyStateDefaults.headline}
           quickActions={quickActions}
-          subtext={archieEmptyStateDefaults.subtext}
         />
       </Animated.View>
 
