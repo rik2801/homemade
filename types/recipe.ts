@@ -91,6 +91,12 @@ export type PendingSuggestion = {
   unavailableNotice?: boolean;
 };
 
+export type ArchieChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+};
+
 export type AssistantContext = "recipe" | "conversation";
 
 export type AssistantPhase =

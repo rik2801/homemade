@@ -64,6 +64,7 @@ const styles = StyleSheet.create({
   },
   archieBody: {
     flex: 1,
+    minHeight: 0,
     position: "relative"
   },
   archieComposerSlot: {

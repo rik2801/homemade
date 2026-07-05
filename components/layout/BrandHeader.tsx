@@ -2,6 +2,7 @@ import * as Haptics from "expo-haptics";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+import { ArchieLogo } from "@/components/brand/ArchieLogo";
 import { HomemadeLogo } from "@/components/brand/HomemadeLogo";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
@@ -48,7 +49,7 @@ export function BrandHeader() {
           >
             <ChevronLeft color={colors.text} />
           </Pressable>
-          <HomemadeLogo align="center" height={36} style={styles.logo} />
+          <ArchieLogo align="center" height={36} style={styles.logo} />
           <View style={styles.backSpacer} />
         </View>
       ) : (

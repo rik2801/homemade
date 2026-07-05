@@ -11,8 +11,11 @@ import {
   type UserPreferences
 } from "@/features/preferences/data/preferenceOptions";
 import { findIngredientById, getDisplayStep, resolveIngredientIdFromText, userMessageFor } from "@/lib/swapFlow";
+import { appendChatMessages, ARCHIE_PROMPTS } from "@/lib/archieChat";
 import { getAlternateSuggestion } from "@/services/assistantService";
+import { requestArchieChat } from "@/services/aiClient";
 import type {
+  ArchieChatMessage,
   ApplyPhase,
   AssistantContext,
   AssistantPhase,
@@ -50,8 +53,12 @@ type AppState = {
   archSheetVisible: boolean;
   assistantContext: AssistantContext;
   assistantPhase: AssistantPhase;
+  chatMessages: ArchieChatMessage[];
   userMessage: string;
   unknownHint: string | null;
+  assistantReply: string | null;
+  chatLoading: boolean;
+  chatRequestId: number;
   recipeConfirmation: string;
   ingredientConfirmation: string;
   targetRecipeId: string | null;
@@ -151,8 +158,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   archSheetVisible: false,
   assistantContext: "conversation",
   assistantPhase: "idle",
+  chatMessages: [],
   userMessage: "",
   unknownHint: null,
+  assistantReply: null,
+  chatLoading: false,
+  chatRequestId: 0,
   recipeConfirmation: "",
   ingredientConfirmation: "",
   targetRecipeId: null,
@@ -179,7 +190,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  exitArchie: () => set({ activeTab: get().returnTab, archieComposerDraft: "" }),
+  exitArchie: () =>
+    set({
+      activeTab: get().returnTab,
+      archieComposerDraft: ""
+    }),
 
   openRecipe: (recipeId, options) => {
     const recipe = getRecipeById(recipeId);
@@ -227,10 +242,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   startSwapIntent: (message = "Swap an ingredient") => {
     const currentTab = get().activeTab;
 
-    set({
+    set((state) => ({
       ...resetSwapConversation(),
+      chatMessages: appendChatMessages(
+        state.chatMessages,
+        { role: "user", text: message },
+        { role: "assistant", text: ARCHIE_PROMPTS.pickRecipe }
+      ),
       userMessage: message,
       unknownHint: null,
+      assistantReply: null,
+      chatLoading: false,
       recipeConfirmation: "",
       ingredientConfirmation: "",
       selectedIngredientId: null,
@@ -240,7 +262,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       assistantPhase: "pick_recipe",
       activeTab: "archie",
       returnTab: currentTab !== "archie" ? currentTab : get().returnTab
-    });
+    }));
   },
 
   startSwap: (ingredientId, fromRecipe = false) => {
@@ -253,11 +275,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!ingredient || get().hasSubstitution(ingredientId)) return;
 
     const currentTab = get().activeTab;
+    const swapUserMessage = userMessageFor(ingredient);
     const base = {
       selectedIngredientId: ingredientId,
       ...resetSwapConversation(),
-      userMessage: userMessageFor(ingredient),
       unknownHint: null,
+      assistantReply: null,
+      chatLoading: false,
       recipeConfirmation: "",
       ingredientConfirmation: "",
       lastApplied: null,
@@ -267,19 +291,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
 
     if (fromRecipe) {
-      set({
+      set((state) => ({
         ...base,
+        chatMessages: appendChatMessages(
+          state.chatMessages,
+          { role: "user", text: swapUserMessage },
+          { role: "assistant", text: ARCHIE_PROMPTS.pickSubstitute }
+        ),
+        userMessage: swapUserMessage,
         targetRecipeId: recipe.id,
         assistantPhase: "awaiting_substitute"
-      });
+      }));
       return;
     }
 
-    set({
+    set((state) => ({
       ...base,
+      chatMessages: appendChatMessages(
+        state.chatMessages,
+        { role: "user", text: swapUserMessage },
+        { role: "assistant", text: ARCHIE_PROMPTS.pickRecipe }
+      ),
+      userMessage: swapUserMessage,
       targetRecipeId: null,
       assistantPhase: "pick_recipe"
-    });
+    }));
   },
 
   selectRecipeForSwap: (recipeId) => {
@@ -290,25 +326,35 @@ export const useAppStore = create<AppState>((set, get) => ({
     const appliedSubstitutions = isSwapDemoRecipe(recipeId) ? get().appliedSubstitutions : {};
 
     if (!selectedIngredientId) {
-      set({
+      set((state) => ({
         ...loadRecipeState(recipe, appliedSubstitutions),
+        chatMessages: appendChatMessages(
+          state.chatMessages,
+          { role: "user", text: recipe.title },
+          { role: "assistant", text: ARCHIE_PROMPTS.pickIngredient }
+        ),
         targetRecipeId: recipeId,
         recipeConfirmation: recipe.title,
         ingredientConfirmation: "",
         assistantPhase: "pick_ingredient",
         ...resetSwapConversation()
-      });
+      }));
       return;
     }
 
-    set({
+    set((state) => ({
       ...loadRecipeState(recipe, appliedSubstitutions),
+      chatMessages: appendChatMessages(
+        state.chatMessages,
+        { role: "user", text: recipe.title },
+        { role: "assistant", text: ARCHIE_PROMPTS.pickSubstitute }
+      ),
       targetRecipeId: recipeId,
       recipeConfirmation: recipe.title,
       ingredientConfirmation: "",
       assistantPhase: "awaiting_substitute",
       ...resetSwapConversation()
-    });
+    }));
   },
 
   selectIngredientForConversation: (ingredientId) => {
@@ -316,25 +362,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     const ingredient = findIngredientById(recipe, ingredientId);
     if (!ingredient || get().hasSubstitution(ingredientId)) return;
 
-    set({
+    set((state) => ({
       selectedIngredientId: ingredientId,
+      chatMessages: appendChatMessages(
+        state.chatMessages,
+        { role: "user", text: ingredient.label },
+        { role: "assistant", text: ARCHIE_PROMPTS.pickSubstitute }
+      ),
       ingredientConfirmation: ingredient.label,
       assistantPhase: "awaiting_substitute",
       ...resetSwapConversation()
-    });
+    }));
   },
 
   selectUserSubstitute: (userHas) => {
     const trimmed = userHas.trim();
     if (!trimmed || !get().selectedIngredientId) return;
 
-    set({
+    set((state) => ({
+      chatMessages: appendChatMessages(state.chatMessages, { role: "user", text: trimmed }),
       userHasSubstitute: trimmed,
       userSubstituteReply: trimmed,
       assistantPhase: "loading",
       pendingSuggestion: null,
       progressStep: 0
-    });
+    }));
   },
 
   requestComposerFocus: () =>
@@ -444,7 +496,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       pendingSuggestion.displayItem,
       {
         dietaryGoals: get().dietaryGoals,
-        allergies: get().allergies
+        allergies: get().allergies,
+        cookingFor: get().cookingFor,
+        pantryMode: get().pantryMode
       }
     );
     if (alt) {
@@ -464,6 +518,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     if (phase === "loading" || phase === "pick_recipe" || phase === "pick_ingredient") return;
+    if (get().chatLoading) return;
 
     const normalized = text.toLowerCase();
     const isSwapIntent =
@@ -477,19 +532,65 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    const { recipe } = get();
+    const { recipe, chatMessages } = get();
     const ingredientId = resolveIngredientIdFromText(recipe, text);
     if (!ingredientId) {
+      const requestId = get().chatRequestId + 1;
+      const nextMessages = appendChatMessages(chatMessages, { role: "user", text });
+
       set({
+        chatMessages: nextMessages,
         userMessage: text,
-        unknownHint: UNKNOWN_INGREDIENT_MSG,
-        assistantPhase: "idle",
-        recipeConfirmation: "",
-        ingredientConfirmation: "",
-        pendingSuggestion: null,
-        userHasSubstitute: null,
-        userSubstituteReply: null
+        unknownHint: null,
+        assistantReply: null,
+        chatLoading: true,
+        chatRequestId: requestId,
+        assistantPhase: "idle"
       });
+
+      void requestArchieChat({
+        message: text,
+        history: nextMessages.slice(0, -1).map((item) => ({
+          role: item.role,
+          content: item.text
+        })),
+        recipe: {
+          id: recipe.id,
+          title: recipe.title,
+          ingredients: recipe.ingredients.map((item) => ({
+            id: item.id,
+            amount: item.amount,
+            label: item.label
+          })),
+          steps: recipe.steps
+        },
+        dietaryGoals: get().dietaryGoals,
+        allergies: get().allergies,
+        cookingFor: get().cookingFor,
+        pantryMode: get().pantryMode
+      })
+        .then((response) => {
+          if (get().chatRequestId !== requestId) return;
+          set((state) => ({
+            chatLoading: false,
+            assistantReply: null,
+            chatMessages: appendChatMessages(state.chatMessages, {
+              role: "assistant",
+              text: response.reply
+            })
+          }));
+        })
+        .catch(() => {
+          if (get().chatRequestId !== requestId) return;
+          set((state) => ({
+            chatLoading: false,
+            assistantReply: null,
+            chatMessages: appendChatMessages(state.chatMessages, {
+              role: "assistant",
+              text: UNKNOWN_INGREDIENT_MSG
+            })
+          }));
+        });
       return;
     }
 

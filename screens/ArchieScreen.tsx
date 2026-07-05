@@ -15,6 +15,7 @@ import { SubstitutePromptChips } from "@/components/archie/SubstitutePromptChips
 import { AppText } from "@/components/primitives/AppText";
 import { SwapRecommendationCard } from "@/components/swap/SwapRecommendationCard";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { appendChatMessages } from "@/lib/archieChat";
 import { runSwapGeneration } from "@/services/assistantService";
 import { useAppStore } from "@/store/useAppStore";
 import { fontFamily } from "@/theme/typography";
@@ -25,11 +26,9 @@ export function ArchieScreen() {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const assistantPhase = useAppStore((state) => state.assistantPhase);
-  const userMessage = useAppStore((state) => state.userMessage);
-  const unknownHint = useAppStore((state) => state.unknownHint);
-  const recipeConfirmation = useAppStore((state) => state.recipeConfirmation);
-  const ingredientConfirmation = useAppStore((state) => state.ingredientConfirmation);
-  const userSubstituteReply = useAppStore((state) => state.userSubstituteReply);
+  const recipe = useAppStore((state) => state.recipe);
+  const chatMessages = useAppStore((state) => state.chatMessages);
+  const chatLoading = useAppStore((state) => state.chatLoading);
   const pendingSuggestion = useAppStore((state) => state.pendingSuggestion);
   const progressStep = useAppStore((state) => state.progressStep);
   const selectedIngredientId = useAppStore((state) => state.selectedIngredientId);
@@ -37,6 +36,8 @@ export function ArchieScreen() {
   const fallbackMode = useAppStore((state) => state.fallbackMode);
   const dietaryGoals = useAppStore((state) => state.dietaryGoals);
   const allergies = useAppStore((state) => state.allergies);
+  const cookingFor = useAppStore((state) => state.cookingFor);
+  const pantryMode = useAppStore((state) => state.pantryMode);
   const lastApplied = useAppStore((state) => state.lastApplied);
   const applyPhase = useAppStore((state) => state.applyPhase);
   const startSwapIntent = useAppStore((state) => state.startSwapIntent);
@@ -46,7 +47,11 @@ export function ArchieScreen() {
   const setAssistantPhase = useAppStore((state) => state.setAssistantPhase);
 
   const showWelcome =
-    assistantPhase === "idle" && !userMessage && !unknownHint && !pendingSuggestion && !lastApplied;
+    assistantPhase === "idle" &&
+    chatMessages.length === 0 &&
+    !chatLoading &&
+    !pendingSuggestion &&
+    !lastApplied;
 
   const emptyOpacity = useSharedValue(showWelcome ? 1 : 0);
   const conversationOpacity = useSharedValue(showWelcome ? 0 : 1);
@@ -58,19 +63,24 @@ export function ArchieScreen() {
 
   useEffect(() => {
     if (showWelcome) return;
-    scrollRef.current?.scrollToEnd({ animated: true });
+    const frame = requestAnimationFrame(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [
     assistantPhase,
     applyPhase,
+    chatLoading,
+    chatMessages,
     pendingSuggestion,
-    recipeConfirmation,
-    ingredientConfirmation,
     showWelcome,
-    unknownHint,
-    userMessage,
-    userSubstituteReply,
     lastApplied
   ]);
+
+  function handleContentSizeChange() {
+    if (showWelcome) return;
+    scrollRef.current?.scrollToEnd({ animated: false });
+  }
 
   useEffect(() => {
     if (assistantPhase !== "loading" || !selectedIngredientId || !userHasSubstitute) return;
@@ -87,14 +97,22 @@ export function ArchieScreen() {
 
     let cancelled = false;
 
-    runSwapGeneration(selectedIngredientId, userHasSubstitute, fallbackMode, {
+    runSwapGeneration(recipe, selectedIngredientId, userHasSubstitute, fallbackMode, {
       dietaryGoals,
-      allergies
+      allergies,
+      cookingFor,
+      pantryMode
     }).then((suggestion) => {
       if (cancelled) return;
       clearInterval(interval);
       setProgressStep(3);
       setPendingSuggestion(suggestion);
+      useAppStore.setState((state) => ({
+        chatMessages: appendChatMessages(state.chatMessages, {
+          role: "assistant",
+          text: `Try ${suggestion.displayItem} (${suggestion.recommendedUsage}). ${suggestion.why}`
+        })
+      }));
       setAssistantPhase("suggestion");
     });
 
@@ -104,11 +122,14 @@ export function ArchieScreen() {
     };
   }, [
     assistantPhase,
+    recipe,
     selectedIngredientId,
     userHasSubstitute,
     fallbackMode,
     dietaryGoals,
     allergies,
+    cookingFor,
+    pantryMode,
     setAssistantPhase,
     setPendingSuggestion,
     setProgressStep
@@ -121,25 +142,6 @@ export function ArchieScreen() {
     },
     []
   );
-
-  const showRecipeStep =
-    assistantPhase === "pick_recipe" ||
-    Boolean(recipeConfirmation) ||
-    assistantPhase === "pick_ingredient" ||
-    Boolean(ingredientConfirmation) ||
-    assistantPhase === "awaiting_substitute" ||
-    assistantPhase === "loading" ||
-    assistantPhase === "suggestion" ||
-    assistantPhase === "applied";
-
-  const showIngredientStep = assistantPhase === "pick_ingredient" || Boolean(ingredientConfirmation);
-
-  const showSubstituteStep =
-    assistantPhase === "awaiting_substitute" ||
-    Boolean(userSubstituteReply) ||
-    assistantPhase === "loading" ||
-    assistantPhase === "suggestion" ||
-    assistantPhase === "applied";
 
   const quickActions = useMemo(
     () => [
@@ -200,73 +202,60 @@ export function ArchieScreen() {
       <Animated.View pointerEvents={showWelcome ? "none" : "auto"} style={[styles.conversationLayer, conversationStyle]}>
         <ScrollView
           ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          onContentSizeChange={handleContentSizeChange}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.content,
-            { paddingBottom: composerInset }
+            { paddingBottom: composerInset, paddingTop: spacing.sm }
           ]}
           style={styles.conversationScroll}
         >
-          {userMessage ? (
-            <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.brand }]}>
-              <AppText style={[styles.userText, { color: colors.brandOnBrand }]}>{userMessage}</AppText>
-            </View>
-          ) : null}
-
-          {unknownHint ? (
-            <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
-              <AppText muted style={styles.intro}>
-                {unknownHint}
+          {chatMessages.map((message) => (
+            <View
+              key={message.id}
+              style={[
+                styles.bubble,
+                message.role === "user" ? styles.userBubble : styles.assistBubble,
+                {
+                  backgroundColor: message.role === "user" ? colors.brand : colors.canvas
+                }
+              ]}
+            >
+              <AppText
+                muted={message.role === "assistant"}
+                style={[
+                  message.role === "user" ? styles.userText : styles.intro,
+                  message.role === "user" ? { color: colors.brandOnBrand } : undefined
+                ]}
+              >
+                {message.text}
               </AppText>
             </View>
-          ) : null}
+          ))}
 
-          {showRecipeStep ? (
+          {assistantPhase === "pick_recipe" ? (
             <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
-              <AppText muted style={styles.intro}>
-                Which recipe should I use for this swap?
-              </AppText>
-              {assistantPhase === "pick_recipe" ? <RecipePickerCards /> : null}
+              <RecipePickerCards />
             </View>
           ) : null}
 
-          {recipeConfirmation ? (
-            <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.brand }]}>
-              <AppText style={[styles.userText, { color: colors.brandOnBrand }]}>{recipeConfirmation}</AppText>
-            </View>
-          ) : null}
-
-          {showIngredientStep ? (
+          {assistantPhase === "pick_ingredient" ? (
             <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
-              <AppText muted style={styles.intro}>
-                Which ingredient would you like to swap?
-              </AppText>
-              {assistantPhase === "pick_ingredient" ? <IngredientPickerCards /> : null}
+              <IngredientPickerCards />
             </View>
           ) : null}
 
-          {ingredientConfirmation ? (
-            <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.brand }]}>
-              <AppText style={[styles.userText, { color: colors.brandOnBrand }]}>{ingredientConfirmation}</AppText>
-            </View>
-          ) : null}
-
-          {showSubstituteStep ? (
+          {assistantPhase === "awaiting_substitute" ? (
             <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
-              <AppText muted style={styles.intro}>
-                What do you have available instead?
-              </AppText>
-              {assistantPhase === "awaiting_substitute" ? <SubstitutePromptChips /> : null}
+              <SubstitutePromptChips />
             </View>
           ) : null}
 
-          {userSubstituteReply && assistantPhase !== "awaiting_substitute" ? (
-            <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.brand }]}>
-              <AppText style={[styles.userText, { color: colors.brandOnBrand }]}>{userSubstituteReply}</AppText>
-            </View>
+          {assistantPhase === "loading" || chatLoading ? (
+            <ArchieProgressCard key={`progress-${progressStep}-${chatLoading ? "chat" : "swap"}`} />
           ) : null}
-
-          {assistantPhase === "loading" ? <ArchieProgressCard key={`progress-${progressStep}`} /> : null}
 
           {pendingSuggestion && (assistantPhase === "suggestion" || applyPhase === "loading") ? (
             <SwapRecommendationCard suggestion={pendingSuggestion} />
@@ -303,10 +292,12 @@ const styles = StyleSheet.create({
   },
   conversationLayer: {
     flex: 1,
+    minHeight: 0,
     zIndex: 0
   },
   conversationScroll: {
-    flex: 1
+    flex: 1,
+    minHeight: 0
   },
   content: {
     gap: spacing.lg,

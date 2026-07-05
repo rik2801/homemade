@@ -6,10 +6,13 @@
   "scripts": {
     "postinstall": "node scripts/patch-expo-modules-jsi.cjs",
     "start": "expo start",
+    "dev:app": "expo start",
+    "dev:backend": "cd backend && npm run dev",
     "ios": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:backend": "cd backend && npm run typecheck"
   },
   "dependencies": {
     "@shopify/flash-list": "2.0.2",

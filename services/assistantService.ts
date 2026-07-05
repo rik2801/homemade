@@ -1,11 +1,13 @@
 import { CREAM_STEP_GREEK_YOGURT_MILK, homemadeRecipe } from "@/features/recipe/data/homemadeRecipe";
+import type { PantryMode } from "@/features/preferences/data/preferenceOptions";
 import { findIngredientById } from "@/lib/swapFlow";
 import { formatDietaryFit } from "@/lib/preferences";
-import type { Ingredient, PendingSuggestion } from "@/types/recipe";
-
-function aiSimDelay() {
-  return 900 + Math.floor(Math.random() * 301);
-}
+import {
+  buildSubstituteApiRequest,
+  requestIngredientSubstitution,
+  type SubstituteApiResponse
+} from "@/services/aiClient";
+import type { Ingredient, PendingSuggestion, Recipe } from "@/types/recipe";
 
 type RecommendationResult = {
   substituteItem: string;
@@ -143,12 +145,34 @@ function buildGenericRecommendation(ingredient: Ingredient, userHas: string, for
   };
 }
 
-function buildRecommendation(ingredient: Ingredient, userHas: string, forceFallback: boolean): RecommendationResult {
+function buildLocalRecommendation(
+  ingredient: Ingredient,
+  userHas: string,
+  forceFallback: boolean
+): RecommendationResult {
   if (ingredient.label === "heavy cream") {
     return buildHeavyCreamRecommendation(userHas, forceFallback);
   }
 
   return buildGenericRecommendation(ingredient, userHas, forceFallback);
+}
+
+function apiResponseToRecommendation(response: SubstituteApiResponse): RecommendationResult {
+  const { recommendation, source } = response;
+
+  return {
+    substituteItem: recommendation.name,
+    displayItem: recommendation.name,
+    recommendedUsage: recommendation.amount,
+    ratio: recommendation.amount,
+    why: recommendation.whyThisWorks,
+    dietaryFit: recommendation.dietaryFit,
+    recipeImpact: recommendation.recipeImpact,
+    confidence: recommendation.confidence,
+    source,
+    benefits: recommendation.benefits,
+    stepOverride: recommendation.updatedStep
+  };
 }
 
 function toPendingSuggestion(
@@ -169,7 +193,7 @@ function toPendingSuggestion(
     recommendedUsage: result.recommendedUsage,
     ratio: result.ratio,
     why: result.why,
-    dietaryFit: formatDietaryFit(dietaryGoals, allergies),
+    dietaryFit: result.dietaryFit ?? formatDietaryFit(dietaryGoals, allergies),
     recipeImpact: result.recipeImpact,
     confidence: result.confidence,
     source: result.source,
@@ -182,30 +206,57 @@ function toPendingSuggestion(
 type PreferenceContext = {
   dietaryGoals: string[];
   allergies: string[];
+  cookingFor: string;
+  pantryMode: PantryMode;
 };
 
 export async function runSwapGeneration(
+  recipe: Recipe,
   ingredientId: string,
   userHas: string,
   forceFallback: boolean,
   preferences: PreferenceContext
 ): Promise<PendingSuggestion> {
-  const ingredient = findIngredientById(homemadeRecipe, ingredientId);
+  const ingredient = findIngredientById(recipe, ingredientId);
   if (!ingredient) {
     throw new Error("Missing ingredient");
   }
 
-  await new Promise<void>((resolve) => setTimeout(resolve, aiSimDelay()));
+  if (forceFallback) {
+    const result = buildLocalRecommendation(ingredient, userHas, true);
+    return toPendingSuggestion(
+      ingredientId,
+      ingredient,
+      userHas,
+      result,
+      preferences.dietaryGoals,
+      preferences.allergies
+    );
+  }
 
-  const result = buildRecommendation(ingredient, userHas, forceFallback);
-  return toPendingSuggestion(
-    ingredientId,
-    ingredient,
-    userHas,
-    result,
-    preferences.dietaryGoals,
-    preferences.allergies
-  );
+  try {
+    const payload = buildSubstituteApiRequest(recipe, ingredient, userHas, preferences);
+    const response = await requestIngredientSubstitution(payload);
+    const result = apiResponseToRecommendation(response);
+    return toPendingSuggestion(
+      ingredientId,
+      ingredient,
+      userHas,
+      result,
+      preferences.dietaryGoals,
+      preferences.allergies
+    );
+  } catch {
+    const result = buildLocalRecommendation(ingredient, userHas, true);
+    return toPendingSuggestion(
+      ingredientId,
+      ingredient,
+      userHas,
+      result,
+      preferences.dietaryGoals,
+      preferences.allergies
+    );
+  }
 }
 
 export function getAlternateSuggestion(
