@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
 import type { TabName } from "@/types/recipe";
@@ -24,6 +24,17 @@ const TAB_BAR_LOW_OFFSET_SCALE = 0.15;
 const TAB_BAR_LIFT_RATIO = 0.3 / 3;
 const ISLAND_BOTTOM_GAP = Math.round(spacing.sm * 1.3);
 const TAB_BAR_VIGNETTE_EXTRA = spacing.xxl;
+const ARCHIE_ICON_SIZE = 38;
+const RECIPES_ICON_SIZE = 24;
+const HOME_ICON_SIZE = 26;
+const PROFILE_ICON_SIZE = 26;
+const ARCHIE_ACTIVE_ICON_COLOR = "#FFFFFF";
+const ARCHIE_GRADIENT = {
+  purple: "#6531FF",
+  magenta: "#DA4A9F",
+  pink: "#E273FD",
+  coral: "#FF608B"
+} as const;
 
 export function tabBarBottomOffset(bottomInset: number) {
   const baseOffset = Math.max(bottomInset, spacing.sm) + spacing.sm;
@@ -75,50 +86,83 @@ function TabBarBottomVignette({ color, height, width }: { color: string; height:
   );
 }
 
+function ArchieActiveIndicator() {
+  const radius = INDICATOR_SIZE / 2;
+
+  return (
+    <Svg height={INDICATOR_SIZE} pointerEvents="none" viewBox={`0 0 ${INDICATOR_SIZE} ${INDICATOR_SIZE}`} width={INDICATOR_SIZE}>
+      <Defs>
+        <RadialGradient
+          cx="32%"
+          cy="24%"
+          fx="18%"
+          fy="12%"
+          gradientUnits="objectBoundingBox"
+          id="archieActiveIndicator"
+          rx="78%"
+          ry="78%"
+        >
+          <Stop offset="0" stopColor={ARCHIE_GRADIENT.pink} />
+          <Stop offset="0.34" stopColor={ARCHIE_GRADIENT.coral} />
+          <Stop offset="0.62" stopColor={ARCHIE_GRADIENT.magenta} />
+          <Stop offset="1" stopColor={ARCHIE_GRADIENT.purple} />
+        </RadialGradient>
+      </Defs>
+      <Circle cx={radius} cy={radius} fill="url(#archieActiveIndicator)" r={radius} />
+    </Svg>
+  );
+}
+
+function tabIconTint(tab: TabIconType, active: boolean, brandOnBrand: string, tabInactive: string) {
+  if (!active) return tabInactive;
+  if (tab === "archie") return ARCHIE_ACTIVE_ICON_COLOR;
+  return brandOnBrand;
+}
+
 function TabIcon({ type, color }: { type: TabIconType; color: string }) {
   if (type === "home") {
     return (
-      <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.75}>
-        <Path d="M3 10.5 12 4l9 6.5V20a1.5 1.5 0 0 1-1.5 1.5H15v-6.5H9V21.5H4.5A1.5 1.5 0 0 1 3 20v-9.5Z" />
+      <Svg width={HOME_ICON_SIZE} height={HOME_ICON_SIZE} viewBox="0 0 24 24" fill="none">
+        <Path
+          fill={color}
+          d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z"
+        />
       </Svg>
     );
   }
 
   if (type === "recipes") {
     return (
-      <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.75}>
-        <Path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+      <Svg width={RECIPES_ICON_SIZE} height={RECIPES_ICON_SIZE} viewBox="0 0 24 24" fill="none">
+        <Path
+          clipRule="evenodd"
+          fill={color}
+          fillRule="evenodd"
+          d="M9 2.3h9.5a.7.7 0 0 1 .7.7v18.8a.7.7 0 0 1-.7.7H9a5 5 0 0 1-5-5V7a5 5 0 0 1 5-4.7z M9 6.9h5a.65.65 0 0 1 0 1.3H9a.65.65 0 0 1 0-1.3z M17.4 16.8H4.2V19Q4.2 22.9 9 22.9h8.4V16.8z"
+        />
       </Svg>
     );
   }
 
   if (type === "archie") {
     return (
-      <View style={styles.sparkleWrap}>
-        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.85} style={styles.sparkleLarge}>
-          <Path d="M12 3v5" />
-          <Path d="M12 16v5" />
-          <Path d="M5 10H2" />
-          <Path d="M22 10h-3" />
-          <Path d="M7.05 5.05 4.93 2.93" />
-          <Path d="M19.07 17.07l-2.12-2.12" />
-          <Path d="M7.05 14.95l-2.12 2.12" />
-          <Path d="M19.07 2.93l-2.12 2.12" />
-        </Svg>
-        <Svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} style={styles.sparkleSmall}>
-          <Path d="M12 6v3" />
-          <Path d="M12 15v3" />
-          <Path d="M8 10H6" />
-          <Path d="M18 10h-2" />
-        </Svg>
-      </View>
+      <Svg width={ARCHIE_ICON_SIZE} height={ARCHIE_ICON_SIZE} viewBox="0 0 24 24" fill="none">
+        <Path
+          fill={color}
+          d="M9 6.5c1 3.5 3 5.5 6 6.2-3 .7-5 2.7-6 6.2-1-3.5-3-5.5-6-6.2 3-.7 5-2.7 6-6.2z"
+        />
+        <Path
+          fill={color}
+          d="M18 3.5c.5 1.7 1.5 2.5 3.2 2.8-1.7.3-2.7 1.1-3.2 2.8-.5-1.7-1.5-2.5-3.2-2.8 1.7-.3 2.7-1.1 3.2-2.8z"
+        />
+      </Svg>
     );
   }
 
   return (
-    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.75}>
-      <Path d="M20 21a8 8 0 1 0-16 0" />
-      <Circle cx={12} cy={7} r={4} />
+    <Svg width={PROFILE_ICON_SIZE} height={PROFILE_ICON_SIZE} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={8} r={4} fill={color} />
+      <Path fill={color} d="M4 20c0-4 3.6-7 8-7s8 3 8 7v1H4v-1z" />
     </Svg>
   );
 }
@@ -170,10 +214,19 @@ export function BottomTabBar() {
         ]}
       >
         <View style={[styles.island, { width: islandWidth }]}>
-          <Animated.View pointerEvents="none" style={[styles.activeIndicator, indicatorStyle]} />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.activeIndicator,
+              indicatorStyle,
+              activeTab !== "archie" && styles.activeIndicatorDefault
+            ]}
+          >
+            {activeTab === "archie" ? <ArchieActiveIndicator /> : null}
+          </Animated.View>
           {tabs.map((tab, index) => {
             const active = activeTab === tab.key;
-            const tint = active ? colors.brandOnBrand : colors.tabInactive;
+            const tint = tabIconTint(tab.icon, active, colors.brandOnBrand, colors.tabInactive);
             const slotLeft = tabSlotLeft(index, tabWidth, islandWidth);
 
             return (
@@ -238,33 +291,21 @@ const styles = StyleSheet.create({
     position: "relative"
   },
   activeIndicator: {
-    backgroundColor: ACTIVE_INDICATOR_COLOR,
     borderRadius: INDICATOR_SIZE / 2,
     height: INDICATOR_SIZE,
+    overflow: "hidden",
     position: "absolute",
     top: INDICATOR_TOP,
     width: INDICATOR_SIZE,
     zIndex: 0
+  },
+  activeIndicatorDefault: {
+    backgroundColor: ACTIVE_INDICATOR_COLOR
   },
   tab: {
     alignItems: "center",
     justifyContent: "center",
     position: "absolute",
     zIndex: 1
-  },
-  sparkleWrap: {
-    height: 22,
-    position: "relative",
-    width: 22
-  },
-  sparkleLarge: {
-    bottom: 0,
-    left: 0,
-    position: "absolute"
-  },
-  sparkleSmall: {
-    position: "absolute",
-    right: 0,
-    top: 0
   }
 });
