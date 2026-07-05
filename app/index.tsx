@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandHeader } from "@/components/layout/BrandHeader";
 import { BottomTabBar } from "@/components/layout/BottomTabBar";
 import { ToastBanner } from "@/components/layout/ToastBanner";
-import { ArchieComposer } from "@/components/archie/ArchieComposer";
+import { ArchieComposer, archieComposerBottomOffset } from "@/components/archie/ArchieComposer";
 import { ArchitecturePrivacySheet } from "@/components/more/ArchitecturePrivacySheet";
 import { PreferenceEditSheet } from "@/components/profile/PreferenceEditSheet";
 import { SwapIngredientSheet } from "@/components/swap/SwapIngredientSheet";
@@ -21,7 +21,7 @@ export default function AppShell() {
   const insets = useSafeAreaInsets();
   const onboardingCompleted = useAppStore((state) => state.onboardingCompleted);
   const activeTab = useAppStore((state) => state.activeTab);
-  const archieComposerBottom = Math.max(insets.bottom, spacing.sm) + spacing.lg;
+  const archieComposerBottom = archieComposerBottomOffset(insets.bottom);
 
   if (!onboardingCompleted) {
     return <OnboardingFlow />;

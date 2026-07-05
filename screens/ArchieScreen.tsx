@@ -1,8 +1,13 @@
 import * as Haptics from "expo-haptics";
-import { useEffect, useRef } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { archieComposerScrollInset } from "@/components/archie/ArchieComposer";
+import {
+  ArchieEmptyState,
+  archieEmptyStateDefaults
+} from "@/components/archie/ArchieEmptyState";
 import { ArchieProgressCard } from "@/components/archie/ArchieProgressCard";
 import { RecipePickerCards } from "@/components/archie/RecipePickerCards";
 import { SubstitutePromptChips } from "@/components/archie/SubstitutePromptChips";
@@ -14,12 +19,6 @@ import { runSwapGeneration } from "@/services/assistantService";
 import { useAppStore } from "@/store/useAppStore";
 import { fontFamily } from "@/theme/typography";
 import { layout, radius, spacing } from "@/theme/spacing";
-
-const PROMPT_CHIPS = [
-  { label: "Swap heavy cream", item: "heavy cream", primary: true },
-  { label: "What can replace salt?", item: "salt", primary: false },
-  { label: "Make this soup lower sodium", item: "salt", primary: false }
-] as const;
 
 export function ArchieScreen() {
   const { colors } = useAppTheme();
@@ -41,21 +40,35 @@ export function ArchieScreen() {
   const lastApplied = useAppStore((state) => state.lastApplied);
   const applyPhase = useAppStore((state) => state.applyPhase);
   const startSwap = useAppStore((state) => state.startSwap);
+  const submitAssistantInput = useAppStore((state) => state.submitAssistantInput);
   const setProgressStep = useAppStore((state) => state.setProgressStep);
   const setPendingSuggestion = useAppStore((state) => state.setPendingSuggestion);
   const setAssistantPhase = useAppStore((state) => state.setAssistantPhase);
 
+  const showWelcome =
+    assistantPhase === "idle" && !userMessage && !unknownHint && !pendingSuggestion && !lastApplied;
+
+  const emptyOpacity = useSharedValue(showWelcome ? 1 : 0);
+  const conversationOpacity = useSharedValue(showWelcome ? 0 : 1);
+
   useEffect(() => {
+    emptyOpacity.value = withTiming(showWelcome ? 1 : 0, { duration: 280 });
+    conversationOpacity.value = withTiming(showWelcome ? 0 : 1, { duration: 280 });
+  }, [conversationOpacity, emptyOpacity, showWelcome]);
+
+  useEffect(() => {
+    if (showWelcome) return;
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [
     assistantPhase,
+    applyPhase,
     pendingSuggestion,
-    userMessage,
-    unknownHint,
     recipeConfirmation,
+    showWelcome,
+    unknownHint,
+    userMessage,
     userSubstituteReply,
-    lastApplied,
-    applyPhase
+    lastApplied
   ]);
 
   useEffect(() => {
@@ -100,137 +113,177 @@ export function ArchieScreen() {
     setProgressStep
   ]);
 
-  async function handleChipPress(item: string) {
-    await Haptics.selectionAsync();
-    const ingredientId = findIngredientIdByLabel(recipe, item);
-    if (ingredientId) {
-      startSwap(ingredientId, false);
-    }
-  }
+  const runQuickAction = useCallback(
+    async (action: () => void) => {
+      await Haptics.selectionAsync();
+      action();
+    },
+    []
+  );
 
-  const showWelcome =
-    assistantPhase === "idle" && !userMessage && !unknownHint && !pendingSuggestion && !lastApplied;
+  const quickActions = useMemo(
+    () => [
+      {
+        id: "swap",
+        label: "Swap an ingredient",
+        onPress: () =>
+          runQuickAction(() => {
+            const ingredientId = findIngredientIdByLabel(recipe, "heavy cream");
+            if (ingredientId) {
+              startSwap(ingredientId, false);
+            }
+          })
+      },
+      {
+        id: "sodium",
+        label: "Lower sodium",
+        onPress: () => runQuickAction(() => submitAssistantInput("Make this soup lower sodium"))
+      },
+      {
+        id: "dairy-free",
+        label: "Dairy-free options",
+        onPress: () =>
+          runQuickAction(() => submitAssistantInput("What dairy-free options work for this recipe?"))
+      },
+      {
+        id: "pantry",
+        label: "Use what I have",
+        onPress: () => runQuickAction(() => submitAssistantInput("Use what I have in my pantry"))
+      }
+    ],
+    [recipe, runQuickAction, startSwap, submitAssistantInput]
+  );
+
+  const emptyStyle = useAnimatedStyle(() => ({
+    opacity: emptyOpacity.value
+  }));
+
+  const conversationStyle = useAnimatedStyle(() => ({
+    opacity: conversationOpacity.value
+  }));
+
+  const composerInset = archieComposerScrollInset(insets.bottom);
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={[
-        styles.content,
-        { paddingBottom: archieComposerScrollInset(insets.bottom) }
-      ]}
-      style={{ backgroundColor: colors.background }}
-    >
-      {showWelcome ? (
-        <View style={styles.welcome}>
-          <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
-            <AppText muted style={styles.intro}>
-              I can help adjust recipes around your pantry and dietary needs. Tell me what ingredient you&apos;re
-              missing and what you have instead.
-            </AppText>
-          </View>
-          <View style={styles.chips}>
-            {PROMPT_CHIPS.map((chip) => (
-              <Pressable
-                key={chip.label}
-                accessibilityRole="button"
-                onPress={() => handleChipPress(chip.item)}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: chip.primary ? colors.brandSoft : colors.surface,
-                    borderColor: colors.brandBorder
-                  }
-                ]}
-              >
-                <AppText
-                  style={[
-                    styles.chipText,
-                    { color: colors.brandOnBrand, fontWeight: chip.primary ? "600" : "500" }
-                  ]}
-                >
-                  {chip.label}
-                </AppText>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      ) : null}
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      <Animated.View
+        pointerEvents={showWelcome ? "auto" : "none"}
+        style={[
+          styles.emptyLayer,
+          emptyStyle,
+          {
+            paddingBottom: composerInset * 0.45,
+            paddingHorizontal: layout.screenPadding
+          }
+        ]}
+      >
+        <ArchieEmptyState
+          headline={archieEmptyStateDefaults.headline}
+          quickActions={quickActions}
+          subtext={archieEmptyStateDefaults.subtext}
+        />
+      </Animated.View>
 
-      {userMessage ? (
-        <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.brand }]}>
-          <AppText style={[styles.userText, { color: colors.brandOnBrand }]}>{userMessage}</AppText>
-        </View>
-      ) : null}
+      <Animated.View pointerEvents={showWelcome ? "none" : "auto"} style={[styles.conversationLayer, conversationStyle]}>
+        <ScrollView
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: composerInset }
+          ]}
+          style={styles.conversationScroll}
+        >
+          {userMessage ? (
+            <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.brand }]}>
+              <AppText style={[styles.userText, { color: colors.brandOnBrand }]}>{userMessage}</AppText>
+            </View>
+          ) : null}
 
-      {unknownHint ? (
-        <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
-          <AppText muted style={styles.intro}>
-            {unknownHint}
-          </AppText>
-        </View>
-      ) : null}
+          {unknownHint ? (
+            <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
+              <AppText muted style={styles.intro}>
+                {unknownHint}
+              </AppText>
+            </View>
+          ) : null}
 
-      {recipeConfirmation ? (
-        <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.brand }]}>
-          <AppText style={[styles.userText, { color: colors.brandOnBrand }]}>{recipeConfirmation}</AppText>
-        </View>
-      ) : null}
+          {recipeConfirmation ? (
+            <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.brand }]}>
+              <AppText style={[styles.userText, { color: colors.brandOnBrand }]}>{recipeConfirmation}</AppText>
+            </View>
+          ) : null}
 
-      {assistantPhase === "pick_recipe" ? (
-        <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
-          <AppText muted style={styles.intro}>
-            Which recipe should I use for this swap?
-          </AppText>
-          <RecipePickerCards />
-        </View>
-      ) : null}
+          {assistantPhase === "pick_recipe" ? (
+            <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
+              <AppText muted style={styles.intro}>
+                Which recipe should I use for this swap?
+              </AppText>
+              <RecipePickerCards />
+            </View>
+          ) : null}
 
-      {assistantPhase === "awaiting_substitute" ? (
-        <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
-          <AppText muted style={styles.intro}>
-            What do you have available instead?
-          </AppText>
-          <SubstitutePromptChips />
-        </View>
-      ) : null}
+          {assistantPhase === "awaiting_substitute" ? (
+            <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
+              <AppText muted style={styles.intro}>
+                What do you have available instead?
+              </AppText>
+              <SubstitutePromptChips />
+            </View>
+          ) : null}
 
-      {userSubstituteReply && assistantPhase !== "awaiting_substitute" ? (
-        <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.brand }]}>
-          <AppText style={[styles.userText, { color: colors.brandOnBrand }]}>{userSubstituteReply}</AppText>
-        </View>
-      ) : null}
+          {userSubstituteReply && assistantPhase !== "awaiting_substitute" ? (
+            <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.brand }]}>
+              <AppText style={[styles.userText, { color: colors.brandOnBrand }]}>{userSubstituteReply}</AppText>
+            </View>
+          ) : null}
 
-      {assistantPhase === "loading" ? <ArchieProgressCard key={`progress-${progressStep}`} /> : null}
+          {assistantPhase === "loading" ? <ArchieProgressCard key={`progress-${progressStep}`} /> : null}
 
-      {pendingSuggestion && (assistantPhase === "suggestion" || applyPhase === "loading") ? (
-        <SwapRecommendationCard suggestion={pendingSuggestion} />
-      ) : null}
+          {pendingSuggestion && (assistantPhase === "suggestion" || applyPhase === "loading") ? (
+            <SwapRecommendationCard suggestion={pendingSuggestion} />
+          ) : null}
 
-      {assistantPhase === "applied" && lastApplied ? (
-        <View style={[styles.appliedCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-          <AppText style={[styles.appliedTitle, { color: colors.green }]}>✓ Applied to recipe</AppText>
-          <AppText muted style={styles.intro}>
-            <AppText style={{ fontWeight: "700" }}>{lastApplied.currentItem}</AppText> has replaced{" "}
-            <AppText style={{ fontWeight: "700" }}>{lastApplied.originalItem}</AppText>.
-          </AppText>
-          <AppText muted style={styles.intro}>
-            View the updated ingredient on the Recipes tab.
-          </AppText>
-        </View>
-      ) : null}
-    </ScrollView>
+          {assistantPhase === "applied" && lastApplied ? (
+            <View style={[styles.appliedCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              <AppText style={[styles.appliedTitle, { color: colors.green }]}>✓ Applied to recipe</AppText>
+              <AppText muted style={styles.intro}>
+                <AppText style={{ fontWeight: "700" }}>{lastApplied.currentItem}</AppText> has replaced{" "}
+                <AppText style={{ fontWeight: "700" }}>{lastApplied.originalItem}</AppText>.
+              </AppText>
+              <AppText muted style={styles.intro}>
+                View the updated ingredient on the Recipes tab.
+              </AppText>
+            </View>
+          ) : null}
+        </ScrollView>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1
+  },
+  emptyLayer: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    justifyContent: "center",
+    transform: [{ translateY: -28 }],
+    zIndex: 1
+  },
+  conversationLayer: {
+    flex: 1,
+    zIndex: 0
+  },
+  conversationScroll: {
+    flex: 1
+  },
   content: {
     gap: spacing.lg,
     paddingHorizontal: layout.screenPadding,
     paddingTop: 4
-  },
-  welcome: {
-    gap: spacing.lg
   },
   bubble: {
     borderRadius: 20,
@@ -256,22 +309,6 @@ const styles = StyleSheet.create({
     fontFamily,
     fontSize: 15,
     lineHeight: 22
-  },
-  chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  chip: {
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    minHeight: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 10
-  },
-  chipText: {
-    fontFamily,
-    fontSize: 13
   },
   appliedCard: {
     borderRadius: radius.lg,

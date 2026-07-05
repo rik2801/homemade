@@ -57,10 +57,17 @@ function SendArrowIcon({ color }: { color: string }) {
   );
 }
 
-export const ARCHIE_COMPOSER_ESTIMATED_HEIGHT = 96;
+export const ARCHIE_COMPOSER_ESTIMATED_HEIGHT = 128;
+const ARCHIE_COMPOSER_BOTTOM_TRIM = 0.2;
+const ARCHIE_COMPOSER_BOTTOM_LIFT = 0.2;
+
+export function archieComposerBottomOffset(bottomInset: number) {
+  const base = Math.max(bottomInset, spacing.sm) + spacing.lg;
+  return Math.max(spacing.xs, Math.round(base * (ARCHIE_COMPOSER_BOTTOM_TRIM + ARCHIE_COMPOSER_BOTTOM_LIFT)));
+}
 
 export function archieComposerScrollInset(bottomInset: number) {
-  return ARCHIE_COMPOSER_ESTIMATED_HEIGHT + Math.max(bottomInset, spacing.sm) + spacing.lg + spacing.md;
+  return ARCHIE_COMPOSER_ESTIMATED_HEIGHT + archieComposerBottomOffset(bottomInset) + spacing.sm;
 }
 
 export function ArchieComposer() {
@@ -167,19 +174,21 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 24,
     borderWidth: 1,
-    gap: spacing.sm,
+    gap: spacing.md,
+    minHeight: 80,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 1,
     shadowRadius: 20
   },
   input: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 12,
+    fontWeight: "400",
+    lineHeight: 17,
     maxHeight: 120,
-    minHeight: 22,
+    minHeight: 48,
     padding: 0
   },
   toolbar: {
@@ -199,9 +208,9 @@ const styles = StyleSheet.create({
   },
   uploadLabel: {
     fontFamily,
-    fontSize: 15,
-    fontWeight: "700",
-    letterSpacing: -0.2
+    fontSize: 11,
+    fontWeight: "400",
+    letterSpacing: -0.1
   },
   sendBtn: {
     alignItems: "center",
