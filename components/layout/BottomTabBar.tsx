@@ -13,6 +13,7 @@ type TabIconType = "home" | "recipes" | "archie" | "profile";
 
 const ISLAND_MARGIN = 32;
 const ISLAND_VERTICAL_PADDING = 8;
+const ISLAND_BOTTOM_SHIFT_RATIO = 0.05;
 export const TAB_ISLAND_HEIGHT = 76;
 const INDICATOR_SIZE = 60;
 const INDICATOR_TOP = 8;
@@ -23,6 +24,11 @@ const ISLAND_BACKGROUND = "#FFFFFF";
 
 export function floatingTabBarScrollInset(bottomInset: number) {
   return TAB_ISLAND_HEIGHT + Math.max(bottomInset, spacing.sm) + spacing.lg + spacing.sm;
+}
+
+function islandBottomOffset(bottomInset: number, windowHeight: number) {
+  const base = Math.max(bottomInset, spacing.sm) + spacing.sm;
+  return Math.max(bottomInset, base - windowHeight * ISLAND_BOTTOM_SHIFT_RATIO);
 }
 
 const tabs: { key: TabName; label: string; icon: TabIconType }[] = [
@@ -96,7 +102,7 @@ function TabIcon({ type, color }: { type: TabIconType; color: string }) {
 
 export function BottomTabBar() {
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { colors, scheme } = useAppTheme();
   const activeTab = useAppStore((state) => state.activeTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
@@ -125,7 +131,7 @@ export function BottomTabBar() {
   return (
     <View
       pointerEvents="box-none"
-      style={[styles.shell, { bottom: Math.max(insets.bottom, spacing.sm) + spacing.sm }]}
+      style={[styles.shell, { bottom: islandBottomOffset(insets.bottom, windowHeight) }]}
     >
       <View
         style={[
