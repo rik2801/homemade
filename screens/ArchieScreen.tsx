@@ -181,7 +181,7 @@ export function ArchieScreen() {
   const composerInset = archieComposerScrollInset(insets.bottom);
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.brandSoft }]}>
       <Animated.View
         pointerEvents={showWelcome ? "box-none" : "none"}
         style={[

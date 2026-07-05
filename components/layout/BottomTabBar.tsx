@@ -3,7 +3,8 @@ import { useEffect } from "react";
 import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
+import { ArchieMascotAvatar, TAB_MASCOT_SIZE } from "@/components/archie/ArchieMascotAvatar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
 import type { TabName } from "@/types/recipe";
@@ -24,16 +25,9 @@ const TAB_BAR_LOW_OFFSET_SCALE = 0.15;
 const TAB_BAR_LIFT_RATIO = 0.3 / 3;
 const ISLAND_BOTTOM_GAP = Math.round(spacing.sm * 1.3);
 const TAB_BAR_VIGNETTE_EXTRA = spacing.xxl;
-const ARCHIE_ICON_SIZE = 38;
 const RECIPES_ICON_SIZE = 24;
 const HOME_ICON_SIZE = 26;
 const PROFILE_ICON_SIZE = 26;
-const ARCHIE_GRADIENT = {
-  purple: "#6531FF",
-  magenta: "#DA4A9F",
-  pink: "#E273FD",
-  coral: "#FF608B"
-} as const;
 
 export function tabBarBottomOffset(bottomInset: number) {
   const baseOffset = Math.max(bottomInset, spacing.sm) + spacing.sm;
@@ -85,38 +79,6 @@ function TabBarBottomVignette({ color, height, width }: { color: string; height:
   );
 }
 
-function ArchieTabIcon() {
-  return (
-    <Svg width={ARCHIE_ICON_SIZE} height={ARCHIE_ICON_SIZE} viewBox="0 0 24 24" fill="none">
-      <Defs>
-        <RadialGradient
-          cx="32%"
-          cy="24%"
-          fx="18%"
-          fy="12%"
-          gradientUnits="objectBoundingBox"
-          id="archieIconGradient"
-          rx="78%"
-          ry="78%"
-        >
-          <Stop offset="0" stopColor={ARCHIE_GRADIENT.pink} />
-          <Stop offset="0.34" stopColor={ARCHIE_GRADIENT.coral} />
-          <Stop offset="0.62" stopColor={ARCHIE_GRADIENT.magenta} />
-          <Stop offset="1" stopColor={ARCHIE_GRADIENT.purple} />
-        </RadialGradient>
-      </Defs>
-      <Path
-        fill="url(#archieIconGradient)"
-        d="M9 6.5c1 3.5 3 5.5 6 6.2-3 .7-5 2.7-6 6.2-1-3.5-3-5.5-6-6.2 3-.7 5-2.7 6-6.2z"
-      />
-      <Path
-        fill="url(#archieIconGradient)"
-        d="M18 3.5c.5 1.7 1.5 2.5 3.2 2.8-1.7.3-2.7 1.1-3.2 2.8-.5-1.7-1.5-2.5-3.2-2.8 1.7-.3 2.7-1.1 3.2-2.8z"
-      />
-    </Svg>
-  );
-}
-
 function tabIconTint(tab: TabIconType, active: boolean, brandOnBrand: string, tabInactive: string) {
   if (!active) return tabInactive;
   return brandOnBrand;
@@ -148,7 +110,7 @@ function TabIcon({ type, color }: { type: TabIconType; color: string }) {
   }
 
   if (type === "archie") {
-    return <ArchieTabIcon />;
+    return <ArchieMascotAvatar size={TAB_MASCOT_SIZE} />;
   }
 
   return (

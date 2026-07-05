@@ -34,7 +34,7 @@ export default function AppShell() {
         {activeTab === "home" ? <HomeScreen /> : null}
         {activeTab === "recipes" ? <RecipesScreen /> : null}
         {activeTab === "archie" ? (
-          <View style={styles.archieBody}>
+          <View style={[styles.archieBody, { backgroundColor: colors.brandSoft }]}>
             <ArchieScreen />
             <View
               pointerEvents="box-none"

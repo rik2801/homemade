@@ -34,7 +34,7 @@ export function BrandHeader() {
         styles.header,
         {
           paddingTop: insets.top + layout.headerPaddingTop,
-          backgroundColor: colors.background
+          backgroundColor: isArchie ? colors.brandSoft : colors.background
         }
       ]}
     >
