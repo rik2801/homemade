@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomSheet } from "@/components/layout/BottomSheet";
+import { floatingTabBarScrollInset } from "@/components/layout/BottomTabBar";
 import { AppText } from "@/components/primitives/AppText";
 import { CookbookRecipeCard } from "@/components/recipe/CookbookRecipeCard";
 import { CookbookSearchBar, type CookbookSortMode } from "@/components/recipe/CookbookSearchBar";
@@ -35,6 +37,7 @@ function audienceReason(cookingFor: string) {
 
 export function HomeScreen() {
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const openRecipe = useAppStore((state) => state.openRecipe);
   const cookingFor = useAppStore((state) => state.cookingFor);
   const [reasonSheetVisible, setReasonSheetVisible] = useState(false);
@@ -59,7 +62,7 @@ export function HomeScreen() {
     <>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: floatingTabBarScrollInset(insets.bottom) }]}
         style={{ backgroundColor: colors.background }}
       >
         <AppText variant="title" style={styles.pageTitle}>
@@ -117,9 +120,8 @@ function ReasonRow({ label, colors }: { label: string; colors: { brand: string; 
 const styles = StyleSheet.create({
   content: {
     gap: spacing.lg,
-    paddingBottom: spacing.xxl,
     paddingHorizontal: layout.screenPadding,
-    paddingTop: spacing.md
+    paddingTop: spacing.xxl
   },
   pageTitle: {
     fontSize: 18,

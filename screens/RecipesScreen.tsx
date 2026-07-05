@@ -1,7 +1,9 @@
 import * as Haptics from "expo-haptics";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import { AppText } from "@/components/primitives/AppText";
+import { floatingTabBarScrollInset } from "@/components/layout/BottomTabBar";
 import { DietMarker } from "@/components/recipe/DietMarker";
 import { SoupHeroIllustration } from "@/components/recipe/SoupHeroIllustration";
 import { COOKBOOK_ITEMS, type RecipeId } from "@/features/recipe/data/homemadeRecipe";
@@ -23,6 +25,7 @@ export function RecipesScreen() {
 
 function RecipeListView() {
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const openRecipe = useAppStore((state) => state.openRecipe);
 
   async function handleOpen(recipeId: RecipeId) {
@@ -33,7 +36,7 @@ function RecipeListView() {
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: floatingTabBarScrollInset(insets.bottom) }]}
       style={{ backgroundColor: colors.background }}
     >
       <AppText variant="title" style={styles.pageTitle}>
@@ -96,7 +99,6 @@ function ClockIcon({ color }: { color: string }) {
 const styles = StyleSheet.create({
   content: {
     gap: spacing.lg,
-    paddingBottom: spacing.xxl,
     paddingHorizontal: layout.screenPadding,
     paddingTop: spacing.md
   },

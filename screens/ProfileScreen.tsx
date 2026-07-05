@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import * as Haptics from "expo-haptics";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { AppText } from "@/components/primitives/AppText";
+import { floatingTabBarScrollInset } from "@/components/layout/BottomTabBar";
 import { pantryModeLabel } from "@/lib/preferences";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
@@ -19,6 +21,7 @@ const TECH_NOTES = [
 
 export function ProfileScreen() {
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const cookingFor = useAppStore((state) => state.cookingFor);
   const dietaryGoals = useAppStore((state) => state.dietaryGoals);
   const allergies = useAppStore((state) => state.allergies);
@@ -36,7 +39,7 @@ export function ProfileScreen() {
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: floatingTabBarScrollInset(insets.bottom) }]}
       style={{ backgroundColor: colors.background }}
     >
       <SettingsGroup title="Cooking context">
@@ -206,7 +209,6 @@ function BulletList({ items }: { items: string[] }) {
 const styles = StyleSheet.create({
   content: {
     gap: spacing.xxl,
-    paddingBottom: spacing.xxl,
     paddingHorizontal: layout.screenPadding,
     paddingTop: 8
   },

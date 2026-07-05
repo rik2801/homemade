@@ -1,15 +1,29 @@
 import * as Haptics from "expo-haptics";
-import { Pressable, StyleSheet, View } from "react-native";
+import { useEffect } from "react";
+import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
-import { AppText } from "@/components/primitives/AppText";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
 import type { TabName } from "@/types/recipe";
-import { fontFamily } from "@/theme/typography";
-import { layout } from "@/theme/spacing";
+import { spacing } from "@/theme/spacing";
 
 type TabIconType = "home" | "recipes" | "archie" | "profile";
+
+const ISLAND_MARGIN = 32;
+const ISLAND_VERTICAL_PADDING = 8;
+export const TAB_ISLAND_HEIGHT = 76;
+const INDICATOR_SIZE = 60;
+const INDICATOR_TOP = 8;
+const CAP_CENTER = TAB_ISLAND_HEIGHT / 2;
+const TAB_COUNT = 4;
+const ACTIVE_INDICATOR_COLOR = "#ECC218";
+const ISLAND_BACKGROUND = "#FFFFFF";
+
+export function floatingTabBarScrollInset(bottomInset: number) {
+  return TAB_ISLAND_HEIGHT + Math.max(bottomInset, spacing.sm) + spacing.lg + spacing.sm;
+}
 
 const tabs: { key: TabName; label: string; icon: TabIconType }[] = [
   { key: "home", label: "Home", icon: "home" },
@@ -17,6 +31,20 @@ const tabs: { key: TabName; label: string; icon: TabIconType }[] = [
   { key: "archie", label: "Archie", icon: "archie" },
   { key: "profile", label: "Profile", icon: "profile" }
 ];
+
+function indicatorLeftForIndex(index: number, tabWidth: number, islandWidth: number) {
+  if (index === 0) {
+    return CAP_CENTER - INDICATOR_SIZE / 2;
+  }
+  if (index === TAB_COUNT - 1) {
+    return islandWidth - CAP_CENTER - INDICATOR_SIZE / 2;
+  }
+  return index * tabWidth + tabWidth / 2 - INDICATOR_SIZE / 2;
+}
+
+function tabSlotLeft(index: number, tabWidth: number, islandWidth: number) {
+  return indicatorLeftForIndex(index, tabWidth, islandWidth);
+}
 
 function TabIcon({ type, color }: { type: TabIconType; color: string }) {
   if (type === "home") {
@@ -68,9 +96,26 @@ function TabIcon({ type, color }: { type: TabIconType; color: string }) {
 
 export function BottomTabBar() {
   const insets = useSafeAreaInsets();
-  const { colors } = useAppTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const { colors, scheme } = useAppTheme();
   const activeTab = useAppStore((state) => state.activeTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
+
+  const islandWidth = windowWidth - ISLAND_MARGIN * 2;
+  const tabWidth = islandWidth / TAB_COUNT;
+  const activeIndex = Math.max(0, tabs.findIndex((tab) => tab.key === activeTab));
+  const indicatorLeft = useSharedValue(indicatorLeftForIndex(activeIndex, tabWidth, islandWidth));
+
+  useEffect(() => {
+    indicatorLeft.value = withSpring(indicatorLeftForIndex(activeIndex, tabWidth, islandWidth), {
+      damping: 20,
+      stiffness: 220
+    });
+  }, [activeIndex, indicatorLeft, islandWidth, tabWidth]);
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    left: indicatorLeft.value
+  }));
 
   async function handlePress(tab: TabName) {
     await Haptics.selectionAsync();
@@ -79,61 +124,90 @@ export function BottomTabBar() {
 
   return (
     <View
-      style={[
-        styles.bar,
-        {
-          paddingBottom: insets.bottom,
-          backgroundColor: "rgba(255, 252, 247, 0.96)",
-          borderTopColor: colors.border
-        }
-      ]}
+      pointerEvents="box-none"
+      style={[styles.shell, { bottom: Math.max(insets.bottom, spacing.sm) + spacing.sm }]}
     >
-      {tabs.map((tab) => {
-        const active = activeTab === tab.key;
-        const tint = active ? colors.brand : colors.tabInactive;
+      <View
+        style={[
+          styles.islandShadow,
+          {
+            shadowColor: scheme === "dark" ? "#000000" : "#111827",
+            width: islandWidth
+          }
+        ]}
+      >
+        <View style={[styles.island, { width: islandWidth }]}>
+          <Animated.View pointerEvents="none" style={[styles.activeIndicator, indicatorStyle]} />
+          {tabs.map((tab, index) => {
+            const active = activeTab === tab.key;
+            const tint = active ? colors.brandOnBrand : colors.tabInactive;
+            const slotLeft = tabSlotLeft(index, tabWidth, islandWidth);
 
-        return (
-          <Pressable
-            key={tab.key}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            onPress={() => handlePress(tab.key)}
-            style={styles.tab}
-          >
-            {active ? <View style={[styles.activeLine, { backgroundColor: colors.brand }]} /> : null}
-            <TabIcon type={tab.icon} color={tint} />
-            <AppText style={[styles.label, { color: tint, fontFamily, opacity: active ? 1 : 0.72 }]}>
-              {tab.label}
-            </AppText>
-          </Pressable>
-        );
-      })}
+            return (
+              <Pressable
+                key={tab.key}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={tab.label}
+                onPress={() => handlePress(tab.key)}
+                style={[
+                  styles.tab,
+                  {
+                    height: INDICATOR_SIZE,
+                    left: slotLeft,
+                    top: INDICATOR_TOP,
+                    width: INDICATOR_SIZE
+                  }
+                ]}
+              >
+                <TabIcon type={tab.icon} color={tint} />
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    minHeight: layout.tabHeight
+  shell: {
+    alignItems: "center",
+    backgroundColor: "transparent",
+    left: 0,
+    pointerEvents: "box-none",
+    position: "absolute",
+    right: 0
+  },
+  islandShadow: {
+    borderRadius: 999,
+    elevation: 12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20
+  },
+  island: {
+    backgroundColor: ISLAND_BACKGROUND,
+    borderRadius: 999,
+    height: TAB_ISLAND_HEIGHT,
+    overflow: "hidden",
+    paddingVertical: ISLAND_VERTICAL_PADDING,
+    position: "relative"
+  },
+  activeIndicator: {
+    backgroundColor: ACTIVE_INDICATOR_COLOR,
+    borderRadius: INDICATOR_SIZE / 2,
+    height: INDICATOR_SIZE,
+    position: "absolute",
+    top: INDICATOR_TOP,
+    width: INDICATOR_SIZE,
+    zIndex: 0
   },
   tab: {
     alignItems: "center",
-    flex: 1,
-    gap: 3,
     justifyContent: "center",
-    paddingVertical: 6
-  },
-  activeLine: {
-    borderRadius: 1,
-    height: 2,
-    marginBottom: 2,
-    width: 18
-  },
-  label: {
-    fontSize: 10,
-    fontWeight: "500"
+    position: "absolute",
+    zIndex: 1
   },
   sparkleWrap: {
     height: 22,
