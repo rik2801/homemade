@@ -28,7 +28,6 @@ const ARCHIE_ICON_SIZE = 38;
 const RECIPES_ICON_SIZE = 24;
 const HOME_ICON_SIZE = 26;
 const PROFILE_ICON_SIZE = 26;
-const ARCHIE_ACTIVE_ICON_COLOR = "#FFFFFF";
 const ARCHIE_GRADIENT = {
   purple: "#6531FF",
   magenta: "#DA4A9F",
@@ -86,11 +85,9 @@ function TabBarBottomVignette({ color, height, width }: { color: string; height:
   );
 }
 
-function ArchieActiveIndicator() {
-  const radius = INDICATOR_SIZE / 2;
-
+function ArchieTabIcon() {
   return (
-    <Svg height={INDICATOR_SIZE} pointerEvents="none" viewBox={`0 0 ${INDICATOR_SIZE} ${INDICATOR_SIZE}`} width={INDICATOR_SIZE}>
+    <Svg width={ARCHIE_ICON_SIZE} height={ARCHIE_ICON_SIZE} viewBox="0 0 24 24" fill="none">
       <Defs>
         <RadialGradient
           cx="32%"
@@ -98,7 +95,7 @@ function ArchieActiveIndicator() {
           fx="18%"
           fy="12%"
           gradientUnits="objectBoundingBox"
-          id="archieActiveIndicator"
+          id="archieIconGradient"
           rx="78%"
           ry="78%"
         >
@@ -108,14 +105,20 @@ function ArchieActiveIndicator() {
           <Stop offset="1" stopColor={ARCHIE_GRADIENT.purple} />
         </RadialGradient>
       </Defs>
-      <Circle cx={radius} cy={radius} fill="url(#archieActiveIndicator)" r={radius} />
+      <Path
+        fill="url(#archieIconGradient)"
+        d="M9 6.5c1 3.5 3 5.5 6 6.2-3 .7-5 2.7-6 6.2-1-3.5-3-5.5-6-6.2 3-.7 5-2.7 6-6.2z"
+      />
+      <Path
+        fill="url(#archieIconGradient)"
+        d="M18 3.5c.5 1.7 1.5 2.5 3.2 2.8-1.7.3-2.7 1.1-3.2 2.8-.5-1.7-1.5-2.5-3.2-2.8 1.7-.3 2.7-1.1 3.2-2.8z"
+      />
     </Svg>
   );
 }
 
 function tabIconTint(tab: TabIconType, active: boolean, brandOnBrand: string, tabInactive: string) {
   if (!active) return tabInactive;
-  if (tab === "archie") return ARCHIE_ACTIVE_ICON_COLOR;
   return brandOnBrand;
 }
 
@@ -145,18 +148,7 @@ function TabIcon({ type, color }: { type: TabIconType; color: string }) {
   }
 
   if (type === "archie") {
-    return (
-      <Svg width={ARCHIE_ICON_SIZE} height={ARCHIE_ICON_SIZE} viewBox="0 0 24 24" fill="none">
-        <Path
-          fill={color}
-          d="M9 6.5c1 3.5 3 5.5 6 6.2-3 .7-5 2.7-6 6.2-1-3.5-3-5.5-6-6.2 3-.7 5-2.7 6-6.2z"
-        />
-        <Path
-          fill={color}
-          d="M18 3.5c.5 1.7 1.5 2.5 3.2 2.8-1.7.3-2.7 1.1-3.2 2.8-.5-1.7-1.5-2.5-3.2-2.8 1.7-.3 2.7-1.1 3.2-2.8z"
-        />
-      </Svg>
-    );
+    return <ArchieTabIcon />;
   }
 
   return (
@@ -172,19 +164,24 @@ export function BottomTabBar() {
   const { width: windowWidth } = useWindowDimensions();
   const { colors, scheme } = useAppTheme();
   const activeTab = useAppStore((state) => state.activeTab);
+  const returnTab = useAppStore((state) => state.returnTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
 
   const islandWidth = windowWidth - ISLAND_MARGIN * 2;
   const tabWidth = islandWidth / TAB_COUNT;
   const activeIndex = Math.max(0, tabs.findIndex((tab) => tab.key === activeTab));
-  const indicatorLeft = useSharedValue(indicatorLeftForIndex(activeIndex, tabWidth, islandWidth));
+  const markerIndex =
+    activeTab === "archie" ? Math.max(0, tabs.findIndex((tab) => tab.key === returnTab)) : activeIndex;
+  const indicatorLeft = useSharedValue(indicatorLeftForIndex(markerIndex, tabWidth, islandWidth));
 
   useEffect(() => {
+    if (activeTab === "archie") return;
+
     indicatorLeft.value = withSpring(indicatorLeftForIndex(activeIndex, tabWidth, islandWidth), {
       dampingRatio: 1,
       duration: 280
     });
-  }, [activeIndex, indicatorLeft, islandWidth, tabWidth]);
+  }, [activeIndex, activeTab, indicatorLeft, islandWidth, tabWidth]);
 
   const indicatorStyle = useAnimatedStyle(() => ({
     left: indicatorLeft.value
@@ -197,62 +194,82 @@ export function BottomTabBar() {
 
   const bottomOffset = tabBarBottomOffset(insets.bottom);
   const vignetteHeight = bottomOffset + TAB_ISLAND_HEIGHT + TAB_BAR_VIGNETTE_EXTRA;
+  const isArchie = activeTab === "archie";
+  const hideDistance = TAB_ISLAND_HEIGHT + bottomOffset + spacing.xxl;
+  const shellTranslateY = useSharedValue(isArchie ? hideDistance : 0);
+
+  useEffect(() => {
+    shellTranslateY.value = withSpring(isArchie ? hideDistance : 0, {
+      dampingRatio: 1,
+      duration: 320
+    });
+  }, [hideDistance, isArchie, shellTranslateY]);
+
+  const slideStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: shellTranslateY.value }]
+  }));
 
   return (
     <>
-      <View pointerEvents="none" style={[styles.vignetteShell, { height: vignetteHeight }]}>
-        <TabBarBottomVignette color={colors.background} height={vignetteHeight} width={windowWidth} />
-      </View>
-      <View pointerEvents="box-none" style={[styles.shell, { bottom: bottomOffset }]}>
-      <View
+      <Animated.View
+        pointerEvents="none"
         style={[
-          styles.islandShadow,
-          {
-            shadowColor: scheme === "dark" ? "#000000" : "#111827",
-            width: islandWidth
-          }
+          styles.vignetteShell,
+          slideStyle,
+          { height: vignetteHeight, width: windowWidth }
         ]}
       >
-        <View style={[styles.island, { width: islandWidth }]}>
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.activeIndicator,
-              indicatorStyle,
-              activeTab !== "archie" && styles.activeIndicatorDefault
-            ]}
-          >
-            {activeTab === "archie" ? <ArchieActiveIndicator /> : null}
-          </Animated.View>
-          {tabs.map((tab, index) => {
-            const active = activeTab === tab.key;
-            const tint = tabIconTint(tab.icon, active, colors.brandOnBrand, colors.tabInactive);
-            const slotLeft = tabSlotLeft(index, tabWidth, islandWidth);
+        <TabBarBottomVignette color={colors.background} height={vignetteHeight} width={windowWidth} />
+      </Animated.View>
+      <Animated.View
+        pointerEvents={isArchie ? "none" : "box-none"}
+        style={[styles.shell, slideStyle, { bottom: bottomOffset, width: windowWidth }]}
+      >
+        <View
+          style={[
+            styles.islandShadow,
+            {
+              shadowColor: scheme === "dark" ? "#000000" : "#111827",
+              width: islandWidth
+            }
+          ]}
+        >
+          <View style={[styles.island, { width: islandWidth }]}>
+            {activeTab !== "archie" ? (
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.activeIndicator, indicatorStyle, styles.activeIndicatorDefault]}
+              />
+            ) : null}
+            {tabs.map((tab, index) => {
+              const active = activeTab === tab.key && tab.key !== "archie";
+              const tint = tabIconTint(tab.icon, active, colors.brandOnBrand, colors.tabInactive);
+              const slotLeft = tabSlotLeft(index, tabWidth, islandWidth);
 
-            return (
-              <Pressable
-                key={tab.key}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={tab.label}
-                onPress={() => handlePress(tab.key)}
-                style={[
-                  styles.tab,
-                  {
-                    height: INDICATOR_SIZE,
-                    left: slotLeft,
-                    top: INDICATOR_TOP,
-                    width: INDICATOR_SIZE
-                  }
-                ]}
-              >
-                <TabIcon type={tab.icon} color={tint} />
-              </Pressable>
-            );
-          })}
+              return (
+                <Pressable
+                  key={tab.key}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={tab.label}
+                  onPress={() => handlePress(tab.key)}
+                  style={[
+                    styles.tab,
+                    {
+                      height: INDICATOR_SIZE,
+                      left: slotLeft,
+                      top: INDICATOR_TOP,
+                      width: INDICATOR_SIZE
+                    }
+                  ]}
+                >
+                  <TabIcon type={tab.icon} color={tint} />
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
-      </View>
-      </View>
+      </Animated.View>
     </>
   );
 }
@@ -263,16 +280,13 @@ const styles = StyleSheet.create({
     left: 0,
     pointerEvents: "none",
     position: "absolute",
-    right: 0,
     zIndex: 0
   },
   shell: {
     alignItems: "center",
     backgroundColor: "transparent",
     left: 0,
-    pointerEvents: "box-none",
     position: "absolute",
-    right: 0,
     zIndex: 1
   },
   islandShadow: {

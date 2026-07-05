@@ -1,6 +1,8 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { archieComposerScrollInset } from "@/components/archie/ArchieComposer";
 import { ArchieProgressCard } from "@/components/archie/ArchieProgressCard";
 import { RecipePickerCards } from "@/components/archie/RecipePickerCards";
 import { SubstitutePromptChips } from "@/components/archie/SubstitutePromptChips";
@@ -13,12 +15,6 @@ import { useAppStore } from "@/store/useAppStore";
 import { fontFamily } from "@/theme/typography";
 import { layout, radius, spacing } from "@/theme/spacing";
 
-const ARCHIE_BULLETS = [
-  "Swap missing ingredients",
-  "Keep dietary needs visible",
-  "Explain recipe changes before applying"
-] as const;
-
 const PROMPT_CHIPS = [
   { label: "Swap heavy cream", item: "heavy cream", primary: true },
   { label: "What can replace salt?", item: "salt", primary: false },
@@ -27,6 +23,7 @@ const PROMPT_CHIPS = [
 
 export function ArchieScreen() {
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const recipe = useAppStore((state) => state.recipe);
   const assistantPhase = useAppStore((state) => state.assistantPhase);
@@ -118,7 +115,10 @@ export function ArchieScreen() {
     <ScrollView
       ref={scrollRef}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: archieComposerScrollInset(insets.bottom) }
+      ]}
       style={{ backgroundColor: colors.background }}
     >
       {showWelcome ? (
@@ -153,19 +153,6 @@ export function ArchieScreen() {
                 </AppText>
               </Pressable>
             ))}
-          </View>
-          <View style={styles.helpSection}>
-            <AppText variant="section">How Archie helps</AppText>
-            <View style={[styles.helpCard, { borderColor: colors.borderLight, backgroundColor: colors.canvas }]}>
-              {ARCHIE_BULLETS.map((item) => (
-                <View key={item} style={styles.helpRow}>
-                  <View style={[styles.helpDot, { backgroundColor: colors.brand }]} />
-                  <AppText muted style={styles.helpText}>
-                    {item}
-                  </AppText>
-                </View>
-              ))}
-            </View>
           </View>
         </View>
       ) : null}
@@ -239,7 +226,6 @@ export function ArchieScreen() {
 const styles = StyleSheet.create({
   content: {
     gap: spacing.lg,
-    paddingBottom: 96,
     paddingHorizontal: layout.screenPadding,
     paddingTop: 4
   },
@@ -297,30 +283,5 @@ const styles = StyleSheet.create({
     fontFamily,
     fontSize: 15,
     fontWeight: "700"
-  },
-  helpSection: {
-    gap: spacing.sm
-  },
-  helpCard: {
-    borderRadius: radius.md,
-    gap: 10,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md
-  },
-  helpRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 10
-  },
-  helpDot: {
-    borderRadius: 3,
-    height: 6,
-    width: 6
-  },
-  helpText: {
-    flex: 1,
-    fontFamily,
-    fontSize: 14,
-    lineHeight: 20
   }
 });

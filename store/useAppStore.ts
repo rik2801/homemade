@@ -38,6 +38,7 @@ type AppState = {
   baseSteps: string[];
   displaySteps: string[];
   activeTab: TabName;
+  returnTab: TabName;
   selectedIngredientId: string | null;
   userHasSubstitute: string | null;
   userSubstituteReply: string | null;
@@ -66,6 +67,7 @@ type AppState = {
   profileSheetMode: ProfileSheetMode;
   profileSheetVisible: boolean;
   setActiveTab: (tab: TabName) => void;
+  exitArchie: () => void;
   openRecipe: (recipeId: string, options?: { showDetail?: boolean }) => void;
   setRecipesView: (view: RecipesView) => void;
   goToTodaysRecipe: () => void;
@@ -132,6 +134,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   baseSteps: homemadeRecipe.steps,
   displaySteps: homemadeRecipe.steps,
   activeTab: "home",
+  returnTab: "home",
   selectedIngredientId: null,
   userHasSubstitute: null,
   userSubstituteReply: null,
@@ -160,11 +163,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   profileSheetMode: null,
   profileSheetVisible: false,
 
-  setActiveTab: (tab) =>
+  setActiveTab: (tab) => {
+    const current = get().activeTab;
     set({
       activeTab: tab,
+      returnTab: tab === "archie" && current !== "archie" ? current : get().returnTab,
       recipesView: tab === "recipes" ? "list" : get().recipesView
-    }),
+    });
+  },
+
+  exitArchie: () => set({ activeTab: get().returnTab }),
 
   openRecipe: (recipeId, options) => {
     const recipe = getRecipeById(recipeId);
@@ -183,7 +191,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   goToTodaysRecipe: () => get().openRecipe(homemadeRecipe.id, { showDetail: true }),
 
-  goToArchie: () => set({ activeTab: "archie" }),
+  goToArchie: () => get().setActiveTab("archie"),
 
   openSwapSheet: () => {
     if (get().assistantPhase === "loading") return;
@@ -218,6 +226,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const ingredient = findIngredientById(recipe, ingredientId);
     if (!ingredient || get().hasSubstitution(ingredientId)) return;
 
+    const currentTab = get().activeTab;
     const base = {
       selectedIngredientId: ingredientId,
       ...resetSwapConversation(),
@@ -226,7 +235,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       recipeConfirmation: "",
       lastApplied: null,
       assistantContext: fromRecipe ? ("recipe" as AssistantContext) : ("conversation" as AssistantContext),
-      activeTab: "archie" as TabName
+      activeTab: "archie" as TabName,
+      returnTab: currentTab !== "archie" ? currentTab : get().returnTab
     };
 
     if (fromRecipe) {

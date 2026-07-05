@@ -1,4 +1,5 @@
 import { StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandHeader } from "@/components/layout/BrandHeader";
 import { BottomTabBar } from "@/components/layout/BottomTabBar";
 import { ToastBanner } from "@/components/layout/ToastBanner";
@@ -13,11 +14,14 @@ import { ProfileScreen } from "@/screens/ProfileScreen";
 import { RecipesScreen } from "@/screens/RecipesScreen";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
+import { layout, spacing } from "@/theme/spacing";
 
 export default function AppShell() {
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const onboardingCompleted = useAppStore((state) => state.onboardingCompleted);
   const activeTab = useAppStore((state) => state.activeTab);
+  const archieComposerBottom = Math.max(insets.bottom, spacing.sm) + spacing.lg;
 
   if (!onboardingCompleted) {
     return <OnboardingFlow />;
@@ -29,10 +33,19 @@ export default function AppShell() {
       <View style={styles.body}>
         {activeTab === "home" ? <HomeScreen /> : null}
         {activeTab === "recipes" ? <RecipesScreen /> : null}
-        {activeTab === "archie" ? <ArchieScreen /> : null}
+        {activeTab === "archie" ? (
+          <View style={styles.archieBody}>
+            <ArchieScreen />
+            <View
+              pointerEvents="box-none"
+              style={[styles.archieComposerSlot, { paddingBottom: archieComposerBottom }]}
+            >
+              <ArchieComposer />
+            </View>
+          </View>
+        ) : null}
         {activeTab === "profile" ? <ProfileScreen /> : null}
       </View>
-      {activeTab === "archie" ? <ArchieComposer /> : null}
       <BottomTabBar />
       <ToastBanner />
       <SwapIngredientSheet />
@@ -48,5 +61,21 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1
+  },
+  archieBody: {
+    flex: 1,
+    position: "relative"
+  },
+  archieComposerSlot: {
+    alignItems: "stretch",
+    bottom: 0,
+    justifyContent: "flex-end",
+    left: 0,
+    paddingHorizontal: layout.screenPadding,
+    paddingTop: spacing.lg,
+    pointerEvents: "box-none",
+    position: "absolute",
+    right: 0,
+    top: 0
   }
 });
