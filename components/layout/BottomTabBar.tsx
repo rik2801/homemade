@@ -108,8 +108,8 @@ export function BottomTabBar() {
 
   useEffect(() => {
     indicatorLeft.value = withSpring(indicatorLeftForIndex(activeIndex, tabWidth, islandWidth), {
-      damping: 20,
-      stiffness: 220
+      dampingRatio: 1,
+      duration: 280
     });
   }, [activeIndex, indicatorLeft, islandWidth, tabWidth]);
 
