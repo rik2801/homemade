@@ -20,16 +20,15 @@ const CAP_CENTER = TAB_ISLAND_HEIGHT / 2;
 const TAB_COUNT = 4;
 const ACTIVE_INDICATOR_COLOR = "#ECC218";
 const ISLAND_BACKGROUND = "#FFFFFF";
-const ISLAND_LIFT_REDUCTION = 0.75;
-const ISLAND_FLOAT_EXTRA = spacing.sm * (1 - ISLAND_LIFT_REDUCTION);
-const ISLAND_SCROLL_GAP = (spacing.lg + spacing.sm) * (1 - ISLAND_LIFT_REDUCTION);
+const TAB_BAR_BOTTOM_OFFSET_SCALE = 0.15;
 
-function islandBottomOffset(bottomInset: number) {
-  return Math.max(bottomInset, spacing.sm) + ISLAND_FLOAT_EXTRA;
+export function tabBarBottomOffset(bottomInset: number) {
+  const baseOffset = Math.max(bottomInset, spacing.sm) + spacing.sm;
+  return baseOffset * TAB_BAR_BOTTOM_OFFSET_SCALE;
 }
 
 export function floatingTabBarScrollInset(bottomInset: number) {
-  return islandBottomOffset(bottomInset) + TAB_ISLAND_HEIGHT + ISLAND_SCROLL_GAP;
+  return TAB_ISLAND_HEIGHT + tabBarBottomOffset(bottomInset) + spacing.sm;
 }
 
 const tabs: { key: TabName; label: string; icon: TabIconType }[] = [
@@ -132,7 +131,7 @@ export function BottomTabBar() {
   return (
     <View
       pointerEvents="box-none"
-      style={[styles.shell, { bottom: islandBottomOffset(insets.bottom) }]}
+      style={[styles.shell, { bottom: tabBarBottomOffset(insets.bottom) }]}
     >
       <View
         style={[
