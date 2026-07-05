@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Path } from "react-native-svg";
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
 import type { TabName } from "@/types/recipe";
@@ -23,6 +23,7 @@ const ISLAND_BACKGROUND = "#FFFFFF";
 const TAB_BAR_LOW_OFFSET_SCALE = 0.15;
 const TAB_BAR_LIFT_RATIO = 0.3 / 3;
 const ISLAND_BOTTOM_GAP = Math.round(spacing.sm * 1.3);
+const TAB_BAR_VIGNETTE_EXTRA = spacing.xxl;
 
 export function tabBarBottomOffset(bottomInset: number) {
   const baseOffset = Math.max(bottomInset, spacing.sm) + spacing.sm;
@@ -54,6 +55,24 @@ function indicatorLeftForIndex(index: number, tabWidth: number, islandWidth: num
 
 function tabSlotLeft(index: number, tabWidth: number, islandWidth: number) {
   return indicatorLeftForIndex(index, tabWidth, islandWidth);
+}
+
+function TabBarBottomVignette({ color, height, width }: { color: string; height: number; width: number }) {
+  return (
+    <Svg pointerEvents="none" width={width} height={height} preserveAspectRatio="none">
+      <Defs>
+        <LinearGradient id="tabBarBottomVignette" x1="0" y1="1" x2="0" y2="0">
+          <Stop offset="0" stopColor={color} stopOpacity="1" />
+          <Stop offset="0.22" stopColor={color} stopOpacity="1" />
+          <Stop offset="0.45" stopColor={color} stopOpacity="0.93" />
+          <Stop offset="0.68" stopColor={color} stopOpacity="0.42" />
+          <Stop offset="0.86" stopColor={color} stopOpacity="0.12" />
+          <Stop offset="1" stopColor={color} stopOpacity="0" />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill="url(#tabBarBottomVignette)" />
+    </Svg>
+  );
 }
 
 function TabIcon({ type, color }: { type: TabIconType; color: string }) {
@@ -132,11 +151,15 @@ export function BottomTabBar() {
     setActiveTab(tab);
   }
 
+  const bottomOffset = tabBarBottomOffset(insets.bottom);
+  const vignetteHeight = bottomOffset + TAB_ISLAND_HEIGHT + TAB_BAR_VIGNETTE_EXTRA;
+
   return (
-    <View
-      pointerEvents="box-none"
-      style={[styles.shell, { bottom: tabBarBottomOffset(insets.bottom) }]}
-    >
+    <>
+      <View pointerEvents="none" style={[styles.vignetteShell, { height: vignetteHeight }]}>
+        <TabBarBottomVignette color={colors.background} height={vignetteHeight} width={windowWidth} />
+      </View>
+      <View pointerEvents="box-none" style={[styles.shell, { bottom: bottomOffset }]}>
       <View
         style={[
           styles.islandShadow,
@@ -176,18 +199,28 @@ export function BottomTabBar() {
           })}
         </View>
       </View>
-    </View>
+      </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  vignetteShell: {
+    bottom: 0,
+    left: 0,
+    pointerEvents: "none",
+    position: "absolute",
+    right: 0,
+    zIndex: 0
+  },
   shell: {
     alignItems: "center",
     backgroundColor: "transparent",
     left: 0,
     pointerEvents: "box-none",
     position: "absolute",
-    right: 0
+    right: 0,
+    zIndex: 1
   },
   islandShadow: {
     borderRadius: 999,
