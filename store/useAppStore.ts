@@ -43,6 +43,7 @@ type AppState = {
   userHasSubstitute: string | null;
   userSubstituteReply: string | null;
   composerFocusToken: number;
+  archieComposerDraft: string;
   appliedSubstitutions: Record<string, SubstitutionRecord>;
   fallbackMode: boolean;
   swapSheetVisible: boolean;
@@ -82,6 +83,7 @@ type AppState = {
   selectRecipeForSwap: (recipeId: string) => void;
   selectUserSubstitute: (userHas: string) => void;
   requestComposerFocus: () => void;
+  setArchieComposerDraft: (text: string) => void;
   setAssistantPhase: (phase: AssistantPhase) => void;
   setProgressStep: (step: number) => void;
   setPendingSuggestion: (suggestion: PendingSuggestion | null) => void;
@@ -139,6 +141,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   userHasSubstitute: null,
   userSubstituteReply: null,
   composerFocusToken: 0,
+  archieComposerDraft: "",
   appliedSubstitutions: {},
   fallbackMode: false,
   swapSheetVisible: false,
@@ -172,7 +175,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  exitArchie: () => set({ activeTab: get().returnTab }),
+  exitArchie: () => set({ activeTab: get().returnTab, archieComposerDraft: "" }),
 
   openRecipe: (recipeId, options) => {
     const recipe = getRecipeById(recipeId);
@@ -285,6 +288,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       composerFocusToken: state.composerFocusToken + 1
     })),
+
+  setArchieComposerDraft: (text) => set({ archieComposerDraft: text }),
 
   setAssistantPhase: (phase) => set({ assistantPhase: phase }),
   setProgressStep: (step) => set({ progressStep: step }),

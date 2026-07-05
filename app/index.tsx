@@ -36,10 +36,7 @@ export default function AppShell() {
         {activeTab === "archie" ? (
           <View style={styles.archieBody}>
             <ArchieScreen />
-            <View
-              pointerEvents="box-none"
-              style={[styles.archieComposerSlot, { paddingBottom: archieComposerBottom }]}
-            >
+            <View style={[styles.archieComposerSlot, { paddingBottom: archieComposerBottom }]}>
               <ArchieComposer />
             </View>
           </View>
@@ -73,9 +70,9 @@ const styles = StyleSheet.create({
     left: 0,
     paddingHorizontal: layout.screenPadding,
     paddingTop: spacing.lg,
-    pointerEvents: "box-none",
     position: "absolute",
     right: 0,
-    top: 0
+    top: 0,
+    zIndex: 2
   }
 });

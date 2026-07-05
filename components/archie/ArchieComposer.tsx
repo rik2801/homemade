@@ -75,8 +75,13 @@ export function ArchieComposer() {
   const inputRef = useRef<TextInput>(null);
   const assistantPhase = useAppStore((state) => state.assistantPhase);
   const composerFocusToken = useAppStore((state) => state.composerFocusToken);
+  const setArchieComposerDraft = useAppStore((state) => state.setArchieComposerDraft);
   const submitAssistantInput = useAppStore((state) => state.submitAssistantInput);
   const [text, setText] = useState("");
+
+  useEffect(() => {
+    return () => setArchieComposerDraft("");
+  }, [setArchieComposerDraft]);
 
   useEffect(() => {
     if (composerFocusToken <= 0) return;
@@ -95,7 +100,13 @@ export function ArchieComposer() {
     if (!trimmed || disabled) return;
     await Haptics.selectionAsync();
     setText("");
+    setArchieComposerDraft("");
     submitAssistantInput(trimmed);
+  }
+
+  function handleChangeText(value: string) {
+    setText(value);
+    setArchieComposerDraft(value);
   }
 
   async function handleUpload() {
@@ -104,7 +115,7 @@ export function ArchieComposer() {
   }
 
   return (
-    <View pointerEvents="box-none" style={styles.wrap}>
+    <View style={styles.wrap}>
       <View
         style={[
           styles.card,
@@ -124,7 +135,7 @@ export function ArchieComposer() {
           style={[styles.input, { color: colors.text, fontFamily }]}
           textAlignVertical="top"
           value={text}
-          onChangeText={setText}
+          onChangeText={handleChangeText}
         />
         <View style={styles.toolbar}>
           <Pressable
@@ -168,7 +179,6 @@ export function ArchieComposer() {
 const styles = StyleSheet.create({
   wrap: {
     alignSelf: "stretch",
-    pointerEvents: "box-none",
     width: "100%"
   },
   card: {

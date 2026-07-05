@@ -167,7 +167,7 @@ export function ArchieScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <Animated.View
-        pointerEvents={showWelcome ? "auto" : "none"}
+        pointerEvents={showWelcome ? "box-none" : "none"}
         style={[
           styles.emptyLayer,
           emptyStyle,

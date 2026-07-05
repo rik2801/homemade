@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Image, StyleSheet, View } from "react-native";
 import Animated, {
+  cancelAnimation,
   Easing,
   type SharedValue,
   useAnimatedStyle,
@@ -11,6 +12,7 @@ import Animated, {
   withTiming
 } from "react-native-reanimated";
 import Svg, { Ellipse } from "react-native-svg";
+import { useAppStore } from "@/store/useAppStore";
 
 export const ARCHIE_MASCOT_IMAGE = require("@/assets/images/MASCOT-HOMEMADE.png");
 export const MASCOT_SIZE = 250;
@@ -25,6 +27,7 @@ const EYES_CENTER_Y = MASCOT_SIZE * 0.51;
 const EYES_TOP = EYES_CENTER_Y - EYE_HEIGHT / 2;
 const EYE_TILT = 5;
 const EYE_LOOK_X = MASCOT_SIZE * 0.014;
+const EYE_LOOK_DOWN = MASCOT_SIZE * 0.038;
 
 function BlinkingEye({
   scaleY,
@@ -52,9 +55,25 @@ function BlinkingEye({
   );
 }
 
+function startIdleLookLoop(lookX: SharedValue<number>) {
+  cancelAnimation(lookX);
+  lookX.value = withRepeat(
+    withSequence(
+      withDelay(2200, withTiming(-EYE_LOOK_X, { duration: 420, easing: Easing.inOut(Easing.quad) })),
+      withDelay(1400, withTiming(EYE_LOOK_X, { duration: 480, easing: Easing.inOut(Easing.quad) })),
+      withDelay(1400, withTiming(0, { duration: 420, easing: Easing.inOut(Easing.quad) }))
+    ),
+    -1,
+    false
+  );
+}
+
 export function ArchieMascotAvatar() {
+  const archieComposerDraft = useAppStore((state) => state.archieComposerDraft);
+  const isLookingDown = archieComposerDraft.length > 0;
   const blinkScale = useSharedValue(1);
   const lookX = useSharedValue(0);
+  const lookY = useSharedValue(0);
 
   useEffect(() => {
     blinkScale.value = withRepeat(
@@ -74,19 +93,19 @@ export function ArchieMascotAvatar() {
   }, [blinkScale]);
 
   useEffect(() => {
-    lookX.value = withRepeat(
-      withSequence(
-        withDelay(2200, withTiming(-EYE_LOOK_X, { duration: 420, easing: Easing.inOut(Easing.quad) })),
-        withDelay(1400, withTiming(EYE_LOOK_X, { duration: 480, easing: Easing.inOut(Easing.quad) })),
-        withDelay(1400, withTiming(0, { duration: 420, easing: Easing.inOut(Easing.quad) }))
-      ),
-      -1,
-      false
-    );
-  }, [lookX]);
+    if (isLookingDown) {
+      cancelAnimation(lookX);
+      lookX.value = withTiming(0, { duration: 200, easing: Easing.inOut(Easing.quad) });
+      lookY.value = withTiming(EYE_LOOK_DOWN, { duration: 280, easing: Easing.inOut(Easing.quad) });
+      return;
+    }
+
+    lookY.value = withTiming(0, { duration: 280, easing: Easing.inOut(Easing.quad) });
+    startIdleLookLoop(lookX);
+  }, [isLookingDown, lookX, lookY]);
 
   const eyesRowStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: lookX.value }]
+    transform: [{ translateX: lookX.value }, { translateY: lookY.value }]
   }));
 
   return (
