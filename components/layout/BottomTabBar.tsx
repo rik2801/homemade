@@ -20,11 +20,15 @@ const CAP_CENTER = TAB_ISLAND_HEIGHT / 2;
 const TAB_COUNT = 4;
 const ACTIVE_INDICATOR_COLOR = "#ECC218";
 const ISLAND_BACKGROUND = "#FFFFFF";
-const TAB_BAR_BOTTOM_OFFSET_SCALE = 0.15;
+const TAB_BAR_LOW_OFFSET_SCALE = 0.15;
+const TAB_BAR_LIFT_RATIO = 0.3 / 3;
+const ISLAND_BOTTOM_GAP = Math.round(spacing.sm * 1.3);
 
 export function tabBarBottomOffset(bottomInset: number) {
   const baseOffset = Math.max(bottomInset, spacing.sm) + spacing.sm;
-  return baseOffset * TAB_BAR_BOTTOM_OFFSET_SCALE;
+  const lowOffset = baseOffset * TAB_BAR_LOW_OFFSET_SCALE;
+  const liftedOffset = bottomInset + ISLAND_BOTTOM_GAP;
+  return lowOffset + (liftedOffset - lowOffset) * TAB_BAR_LIFT_RATIO;
 }
 
 export function floatingTabBarScrollInset(bottomInset: number) {
