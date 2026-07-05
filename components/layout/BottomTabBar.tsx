@@ -1,10 +1,9 @@
 import * as Haptics from "expo-haptics";
-import { Canvas, LinearGradient, Rect, vec } from "@shopify/react-native-skia";
 import { useEffect } from "react";
 import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Path } from "react-native-svg";
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
 import type { TabName } from "@/types/recipe";
@@ -24,7 +23,7 @@ const ISLAND_BACKGROUND = "#FFFFFF";
 const TAB_BAR_LOW_OFFSET_SCALE = 0.15;
 const TAB_BAR_LIFT_RATIO = 0.3 / 3;
 const ISLAND_BOTTOM_GAP = Math.round(spacing.sm * 1.3);
-const TAB_BAR_VIGNETTE_EXTRA = spacing.xxl + spacing.xl;
+const TAB_BAR_VIGNETTE_EXTRA = spacing.xxl;
 
 export function tabBarBottomOffset(bottomInset: number) {
   const baseOffset = Math.max(bottomInset, spacing.sm) + spacing.sm;
@@ -58,55 +57,21 @@ function tabSlotLeft(index: number, tabWidth: number, islandWidth: number) {
   return indicatorLeftForIndex(index, tabWidth, islandWidth);
 }
 
-function colorWithOpacity(hex: string, alpha: number) {
-  const normalized = hex.replace("#", "");
-  const r = parseInt(normalized.slice(0, 2), 16);
-  const g = parseInt(normalized.slice(2, 4), 16);
-  const b = parseInt(normalized.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function TabBarBottomVignette({
-  color,
-  height,
-  solidHeight,
-  width
-}: {
-  color: string;
-  height: number;
-  solidHeight: number;
-  width: number;
-}) {
-  const fadeHeight = Math.max(height - solidHeight, 0);
-  const gradientColors = [
-    colorWithOpacity(color, 0),
-    colorWithOpacity(color, 0.05),
-    colorWithOpacity(color, 0.12),
-    colorWithOpacity(color, 0.22),
-    colorWithOpacity(color, 0.36),
-    colorWithOpacity(color, 0.52),
-    colorWithOpacity(color, 0.7),
-    colorWithOpacity(color, 0.86),
-    color
-  ];
-  const gradientPositions = [0, 0.08, 0.18, 0.3, 0.44, 0.58, 0.72, 0.86, 1];
-
+function TabBarBottomVignette({ color, height, width }: { color: string; height: number; width: number }) {
   return (
-    <View pointerEvents="none" style={{ height, width }}>
-      <Canvas style={{ height, width }}>
-        {fadeHeight > 0 ? (
-          <Rect height={fadeHeight} width={width} x={0} y={0}>
-            <LinearGradient
-              colors={gradientColors}
-              end={vec(0, fadeHeight)}
-              positions={gradientPositions}
-              start={vec(0, 0)}
-            />
-          </Rect>
-        ) : null}
-        <Rect color={color} height={solidHeight} width={width} x={0} y={fadeHeight} />
-      </Canvas>
-    </View>
+    <Svg pointerEvents="none" width={width} height={height} preserveAspectRatio="none">
+      <Defs>
+        <LinearGradient id="tabBarBottomVignette" x1="0" y1="1" x2="0" y2="0">
+          <Stop offset="0" stopColor={color} stopOpacity="1" />
+          <Stop offset="0.22" stopColor={color} stopOpacity="1" />
+          <Stop offset="0.45" stopColor={color} stopOpacity="0.93" />
+          <Stop offset="0.68" stopColor={color} stopOpacity="0.42" />
+          <Stop offset="0.86" stopColor={color} stopOpacity="0.12" />
+          <Stop offset="1" stopColor={color} stopOpacity="0" />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill="url(#tabBarBottomVignette)" />
+    </Svg>
   );
 }
 
@@ -188,18 +153,11 @@ export function BottomTabBar() {
 
   const bottomOffset = tabBarBottomOffset(insets.bottom);
   const vignetteHeight = bottomOffset + TAB_ISLAND_HEIGHT + TAB_BAR_VIGNETTE_EXTRA;
-  const vignetteSolidHeight = bottomOffset + TAB_ISLAND_HEIGHT;
-  const vignetteColor = scheme === "dark" ? colors.background : "#FFFFFF";
 
   return (
     <>
       <View pointerEvents="none" style={[styles.vignetteShell, { height: vignetteHeight }]}>
-        <TabBarBottomVignette
-          color={vignetteColor}
-          height={vignetteHeight}
-          solidHeight={vignetteSolidHeight}
-          width={windowWidth}
-        />
+        <TabBarBottomVignette color={colors.background} height={vignetteHeight} width={windowWidth} />
       </View>
       <View pointerEvents="box-none" style={[styles.shell, { bottom: bottomOffset }]}>
       <View
