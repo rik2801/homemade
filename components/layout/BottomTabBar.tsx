@@ -13,7 +13,6 @@ type TabIconType = "home" | "recipes" | "archie" | "profile";
 
 const ISLAND_MARGIN = 32;
 const ISLAND_VERTICAL_PADDING = 8;
-const ISLAND_BOTTOM_SHIFT_RATIO = 0.05;
 export const TAB_ISLAND_HEIGHT = 76;
 const INDICATOR_SIZE = 60;
 const INDICATOR_TOP = 8;
@@ -21,14 +20,16 @@ const CAP_CENTER = TAB_ISLAND_HEIGHT / 2;
 const TAB_COUNT = 4;
 const ACTIVE_INDICATOR_COLOR = "#ECC218";
 const ISLAND_BACKGROUND = "#FFFFFF";
+const ISLAND_LIFT_REDUCTION = 0.75;
+const ISLAND_FLOAT_EXTRA = spacing.sm * (1 - ISLAND_LIFT_REDUCTION);
+const ISLAND_SCROLL_GAP = (spacing.lg + spacing.sm) * (1 - ISLAND_LIFT_REDUCTION);
 
-export function floatingTabBarScrollInset(bottomInset: number) {
-  return TAB_ISLAND_HEIGHT + Math.max(bottomInset, spacing.sm) + spacing.lg + spacing.sm;
+function islandBottomOffset(bottomInset: number) {
+  return Math.max(bottomInset, spacing.sm) + ISLAND_FLOAT_EXTRA;
 }
 
-function islandBottomOffset(bottomInset: number, windowHeight: number) {
-  const base = Math.max(bottomInset, spacing.sm) + spacing.sm;
-  return Math.max(bottomInset, base - windowHeight * ISLAND_BOTTOM_SHIFT_RATIO);
+export function floatingTabBarScrollInset(bottomInset: number) {
+  return islandBottomOffset(bottomInset) + TAB_ISLAND_HEIGHT + ISLAND_SCROLL_GAP;
 }
 
 const tabs: { key: TabName; label: string; icon: TabIconType }[] = [
@@ -102,7 +103,7 @@ function TabIcon({ type, color }: { type: TabIconType; color: string }) {
 
 export function BottomTabBar() {
   const insets = useSafeAreaInsets();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
   const { colors, scheme } = useAppTheme();
   const activeTab = useAppStore((state) => state.activeTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
@@ -131,7 +132,7 @@ export function BottomTabBar() {
   return (
     <View
       pointerEvents="box-none"
-      style={[styles.shell, { bottom: islandBottomOffset(insets.bottom, windowHeight) }]}
+      style={[styles.shell, { bottom: islandBottomOffset(insets.bottom) }]}
     >
       <View
         style={[
