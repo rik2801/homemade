@@ -1,15 +1,5 @@
 import type { Recipe } from "@/types/recipe";
 
-export const CREAM_STEP_INDEX = 3;
-
-export const CREAM_STEP_ORIGINAL = "Stir in heavy cream; simmer 10 minutes.";
-
-export const CREAM_STEP_YOGURT =
-  "Remove from heat, whisk in plain non-fat Greek yogurt, then warm gently without boiling.";
-
-export const CREAM_STEP_GREEK_YOGURT_MILK =
-  "Reduce heat to low. Stir in Greek yogurt and milk until creamy; do not boil.";
-
 export const RECIPE_CATALOG = [
   {
     id: "creamy-tomato-soup",
@@ -76,9 +66,6 @@ export const homemadeRecipe: Recipe = {
     "Partner-approved swaps stay within low-fat and low-sodium guidance.",
     "No PHI is stored in this local demo."
   ],
-  substitutionIngredientId: "heavy-cream",
-  substitutionStepIndex: CREAM_STEP_INDEX,
-  substitutionStepOriginal: CREAM_STEP_ORIGINAL,
   ingredients: [
     { id: "tomatoes", amount: "28 oz", label: "canned crushed tomatoes", icon: "tomato" },
     {
@@ -100,7 +87,7 @@ export const homemadeRecipe: Recipe = {
     "Heat olive oil in a large pot over medium heat.",
     "Add onion and garlic; sauté until softened, about 5 minutes.",
     "Add crushed tomatoes and vegetable broth; bring to a simmer.",
-    CREAM_STEP_ORIGINAL,
+    "Stir in heavy cream; simmer 10 minutes.",
     "Season with salt and pepper. Blend until smooth and serve."
   ],
   nutrition: {
@@ -111,37 +98,7 @@ export const homemadeRecipe: Recipe = {
       { label: "Fibre", value: "4g" },
       { label: "Sugar", value: "9g" }
     ]
-  },
-  substitutionOptions: [
-    {
-      id: "greek-yogurt-milk",
-      replacement: "Greek yogurt + splash of milk",
-      amount: "1/2 cup yogurt + 2 tbsp milk",
-      whyItWorks:
-        "Greek yogurt adds body and a gentle tang while a splash of milk keeps the soup silky without heavy cream.",
-      dietaryFit: "Lower saturated fat than heavy cream; naturally low-sodium with plain yogurt.",
-      recipeImpact: "Step 4 changes to whisk in off heat — avoids curdling and keeps texture smooth.",
-      confidence: "High"
-    },
-    {
-      id: "evaporated-skim-milk",
-      replacement: "evaporated skim milk",
-      amount: "1/2 cup",
-      whyItWorks: "Thickens quickly and keeps a mild dairy flavor without the weight of cream.",
-      dietaryFit: "Low-fat and usually low-sodium; check the can for partner sodium ceilings.",
-      recipeImpact: "Simmer briefly after adding — less rich but still creamy.",
-      confidence: "High"
-    },
-    {
-      id: "silken-tofu",
-      replacement: "blended silken tofu",
-      amount: "1/2 cup",
-      whyItWorks: "Blended tofu adds a smooth, neutral base that holds onto tomato flavor.",
-      dietaryFit: "Low-fat, dairy-free, and helpful when cream needs to be avoided.",
-      recipeImpact: "Blend very smooth before adding; most neutral flavor of the three options.",
-      confidence: "Medium"
-    }
-  ]
+  }
 };
 
 export const chickenCurryRecipe: Recipe = {
@@ -157,9 +114,6 @@ export const chickenCurryRecipe: Recipe = {
     "Adjust spice level to taste.",
     "No PHI is stored in this local demo."
   ],
-  substitutionIngredientId: "coconut-milk",
-  substitutionStepIndex: 4,
-  substitutionStepOriginal: "Stir in coconut milk and simmer 5 minutes.",
   ingredients: [
     { id: "chicken", amount: "1.5 lbs", label: "boneless chicken thighs", icon: "broth" },
     { id: "onion", amount: "1 large, diced", label: "onion", icon: "onion" },
@@ -186,8 +140,7 @@ export const chickenCurryRecipe: Recipe = {
       { label: "Fibre", value: "3g" },
       { label: "Sugar", value: "5g" }
     ]
-  },
-  substitutionOptions: []
+  }
 };
 
 export const mushroomPastaRecipe: Recipe = {
@@ -203,9 +156,6 @@ export const mushroomPastaRecipe: Recipe = {
     "Use vegetable broth to keep this fully vegetarian.",
     "No PHI is stored in this local demo."
   ],
-  substitutionIngredientId: "parmesan",
-  substitutionStepIndex: 4,
-  substitutionStepOriginal: "Toss with parmesan and fresh parsley.",
   ingredients: [
     { id: "pasta", amount: "12 oz", label: "whole wheat penne", icon: "broth" },
     { id: "mushrooms", amount: "12 oz", label: "cremini mushrooms, sliced", icon: "onion" },
@@ -232,8 +182,7 @@ export const mushroomPastaRecipe: Recipe = {
       { label: "Fibre", value: "7g" },
       { label: "Sugar", value: "4g" }
     ]
-  },
-  substitutionOptions: []
+  }
 };
 
 export const RECIPES_BY_ID: Record<RecipeId, Recipe> = {
@@ -244,10 +193,6 @@ export const RECIPES_BY_ID: Record<RecipeId, Recipe> = {
 
 export function getRecipeById(id: string): Recipe | null {
   return RECIPES_BY_ID[id as RecipeId] ?? null;
-}
-
-export function isSwapDemoRecipe(id: string) {
-  return id === "creamy-tomato-soup";
 }
 
 export const partnerMetrics = [

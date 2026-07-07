@@ -5,17 +5,19 @@ import Svg, { Path } from "react-native-svg";
 import { AppText } from "@/components/primitives/AppText";
 import { IngredientIcon } from "@/components/recipe/IngredientIcon";
 import { SoupHeroIllustration } from "@/components/recipe/SoupHeroIllustration";
-import { isSwapDemoRecipe } from "@/features/recipe/data/homemadeRecipe";
 import type { RecipeId } from "@/features/recipe/data/homemadeRecipe";
 import { iconKeyForLabel } from "@/lib/swapFlow";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
+import type { SubstitutionRecord } from "@/types/recipe";
 import { fontFamily } from "@/theme/typography";
 import { layout, radius, spacing } from "@/theme/spacing";
 
 type RecipeScreenProps = {
   showBack?: boolean;
 };
+
+const EMPTY_SUBSTITUTIONS: Record<string, SubstitutionRecord> = {};
 
 export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
   const { colors } = useAppTheme();
@@ -24,7 +26,9 @@ export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
   const setRecipesView = useAppStore((state) => state.setRecipesView);
   const displaySteps = useAppStore((state) => state.displaySteps);
   const openSwapSheet = useAppStore((state) => state.openSwapSheet);
-  const appliedSubstitutions = useAppStore((state) => state.appliedSubstitutions);
+  const appliedSubstitutions = useAppStore(
+    (state) => state.appliedSubstitutions[state.recipe.id] ?? EMPTY_SUBSTITUTIONS
+  );
   const selectedIngredientId = useAppStore((state) => state.selectedIngredientId);
   const assistantContext = useAppStore((state) => state.assistantContext);
   const justAppliedId = useAppStore((state) => state.justAppliedId);
@@ -40,7 +44,7 @@ export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
   }, [justAppliedId]);
 
   async function handleSwapPress() {
-    if (assistantPhase === "loading" || !isSwapDemoRecipe(recipe.id)) return;
+    if (assistantPhase === "loading") return;
     await Haptics.selectionAsync();
     openSwapSheet();
   }
@@ -50,7 +54,7 @@ export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
     setRecipesView("list");
   }
 
-  const swapEnabled = isSwapDemoRecipe(recipe.id);
+  const swapEnabled = true;
 
   return (
     <ScrollView
@@ -178,10 +182,7 @@ export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
         </View>
         <View style={styles.steps}>
           {displaySteps.map((step, index) => {
-            const isChanged =
-              justAppliedId &&
-              index === recipe.substitutionStepIndex &&
-              appliedSubstitutions[recipe.substitutionIngredientId];
+            const isChanged = Boolean(justAppliedId) && step !== recipe.steps[index];
 
             return (
               <View

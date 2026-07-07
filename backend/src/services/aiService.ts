@@ -13,9 +13,39 @@ const recommendationSchema = z.object({
     recipeImpact: z.string().min(1),
     confidence: z.enum(["High", "Medium", "Low"]),
     updatedStep: z.string().optional(),
+    stepUpdates: z
+      .array(
+        z.object({
+          stepNumber: z.number().int(),
+          text: z.string().min(1),
+          reason: z.string().optional()
+        })
+      )
+      .optional(),
     benefits: z.array(z.string()).min(1)
   })
 });
+
+/**
+ * Converts 1-based model stepNumbers to validated 0-based stepIndexes,
+ * silently dropping anything out of bounds.
+ */
+function normalizeStepUpdates(
+  updates: Array<{ stepNumber: number; text: string; reason?: string }> | undefined,
+  stepCount: number
+) {
+  if (!updates?.length) return undefined;
+
+  const normalized = updates
+    .map((update) => ({
+      stepIndex: update.stepNumber - 1,
+      text: update.text.trim(),
+      ...(update.reason ? { reason: update.reason } : {})
+    }))
+    .filter((update) => update.stepIndex >= 0 && update.stepIndex < stepCount && update.text);
+
+  return normalized.length > 0 ? normalized : undefined;
+}
 
 function extractJson(text: string): unknown {
   const trimmed = text.trim();
@@ -54,6 +84,7 @@ export async function generateSubstitution(request: SubstituteRequest): Promise<
     }
 
     const parsed = recommendationSchema.parse(extractJson(text));
+    const { stepUpdates, ...recommendation } = parsed.recommendation;
 
     console.info("[ai] substitution generated", {
       recipeId: request.recipe.id,
@@ -65,7 +96,10 @@ export async function generateSubstitution(request: SubstituteRequest): Promise<
       source: "ai",
       original: request.ingredientToReplace,
       userHas: request.userHas.trim(),
-      recommendation: parsed.recommendation
+      recommendation: {
+        ...recommendation,
+        stepUpdates: normalizeStepUpdates(stepUpdates, request.recipe.steps.length)
+      }
     };
   } catch (error) {
     console.warn("[ai] generation failed — using fallback", {

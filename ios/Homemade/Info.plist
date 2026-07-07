@@ -55,8 +55,12 @@
 	<array>
 		<string>_expo._tcp</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Homemade needs camera access so you can photograph dishes for Archie.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Expo Dev Launcher uses the local network to discover and connect to development servers running on your computer.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Homemade needs access to your photos so you can share dish images with Archie.</string>
 	<key>NSUserActivityTypes</key>
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

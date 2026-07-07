@@ -1,9 +1,12 @@
 import { StyleSheet, View } from "react-native";
+import { useMemo } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandHeader } from "@/components/layout/BrandHeader";
 import { BottomTabBar } from "@/components/layout/BottomTabBar";
 import { ToastBanner } from "@/components/layout/ToastBanner";
+import { ArchieChatSidebar } from "@/components/archie/ArchieChatSidebar";
 import { ArchieComposer, archieComposerBottomOffset } from "@/components/archie/ArchieComposer";
+import { ComposerAttachmentSheets } from "@/components/archie/ComposerAttachmentSheets";
 import { ArchitecturePrivacySheet } from "@/components/more/ArchitecturePrivacySheet";
 import { PreferenceEditSheet } from "@/components/profile/PreferenceEditSheet";
 import { SwapIngredientSheet } from "@/components/swap/SwapIngredientSheet";
@@ -21,7 +24,10 @@ export default function AppShell() {
   const insets = useSafeAreaInsets();
   const onboardingCompleted = useAppStore((state) => state.onboardingCompleted);
   const activeTab = useAppStore((state) => state.activeTab);
-  const archieComposerBottom = archieComposerBottomOffset(insets.bottom);
+  const archieComposerBottom = useMemo(
+    () => archieComposerBottomOffset(Math.round(insets.bottom)),
+    [insets.bottom]
+  );
 
   if (!onboardingCompleted) {
     return <OnboardingFlow />;
@@ -35,10 +41,14 @@ export default function AppShell() {
         {activeTab === "recipes" ? <RecipesScreen /> : null}
         {activeTab === "archie" ? (
           <View style={[styles.archieBody, { backgroundColor: colors.brandSoft }]}>
-            <ArchieScreen />
+            <View style={styles.archieContent}>
+              <ArchieScreen />
+            </View>
             <View
-              pointerEvents="box-none"
-              style={[styles.archieComposerSlot, { paddingBottom: archieComposerBottom }]}
+              style={[
+                styles.archieComposerFooter,
+                { backgroundColor: colors.brandSoft, paddingBottom: archieComposerBottom }
+              ]}
             >
               <ArchieComposer />
             </View>
@@ -48,7 +58,9 @@ export default function AppShell() {
       </View>
       <BottomTabBar />
       <ToastBanner />
+      <ArchieChatSidebar />
       <SwapIngredientSheet />
+      <ComposerAttachmentSheets />
       <ArchitecturePrivacySheet />
       <PreferenceEditSheet />
     </View>
@@ -64,19 +76,14 @@ const styles = StyleSheet.create({
   },
   archieBody: {
     flex: 1,
-    minHeight: 0,
-    position: "relative"
+    minHeight: 0
   },
-  archieComposerSlot: {
-    alignItems: "stretch",
-    bottom: 0,
-    justifyContent: "flex-end",
-    left: 0,
+  archieContent: {
+    flex: 1,
+    minHeight: 0
+  },
+  archieComposerFooter: {
     paddingHorizontal: layout.screenPadding,
-    paddingTop: spacing.lg,
-    position: "absolute",
-    right: 0,
-    top: 0,
-    zIndex: 2
+    paddingTop: spacing.lg
   }
 });

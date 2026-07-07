@@ -4,7 +4,8 @@ export {
   resolveIngredientIdFromText,
   userMessageFor,
   iconKeyForLabel,
-  getDisplayStep,
+  applyStepOverrides,
+  resolveStepOverrides,
   buildPromptPreview,
   getProgressLabels
 } from "@/lib/swapFlow";

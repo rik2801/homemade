@@ -1,25 +1,58 @@
-import type { ArchieChatMessage } from "@/types/recipe";
+import type {
+  ArchieChatMessage,
+  ArchieImageRecommendation,
+  ArchieStructuredResponse
+} from "@/types/recipe";
 
 export const ARCHIE_PROMPTS = {
   pickRecipe: "Which recipe should I use for this swap?",
+  pickRecipeToAttach: "Which recipe would you like to attach?",
   pickIngredient: "Which ingredient would you like to swap?",
-  pickSubstitute: "What do you have available instead?"
+  pickIngredientToAlter: "Which ingredient would you like to alter?",
+  pickSubstitute: "What do you have available instead?",
+  askAboutRecipe: (title: string) => `What would you like to know about ${title}?`
 } as const;
 
 let chatMessageCounter = 0;
 
-export function createChatMessage(role: ArchieChatMessage["role"], text: string): ArchieChatMessage {
+export function createChatMessage(
+  role: ArchieChatMessage["role"],
+  text: string,
+  options?: {
+    imageUri?: string;
+    recommendation?: ArchieImageRecommendation;
+    structuredResponse?: ArchieStructuredResponse;
+  }
+): ArchieChatMessage {
   chatMessageCounter += 1;
   return {
     id: `chat-${chatMessageCounter}-${Date.now()}`,
     role,
-    text
+    text,
+    ...(options?.imageUri ? { imageUri: options.imageUri } : {}),
+    ...(options?.recommendation ? { recommendation: options.recommendation } : {}),
+    ...(options?.structuredResponse ? { structuredResponse: options.structuredResponse } : {})
   };
 }
 
 export function appendChatMessages(
   messages: ArchieChatMessage[],
-  ...items: Array<{ role: ArchieChatMessage["role"]; text: string }>
+  ...items: Array<{
+    role: ArchieChatMessage["role"];
+    text: string;
+    imageUri?: string;
+    recommendation?: ArchieImageRecommendation;
+    structuredResponse?: ArchieStructuredResponse;
+  }>
 ): ArchieChatMessage[] {
-  return [...messages, ...items.map((item) => createChatMessage(item.role, item.text))];
+  return [
+    ...messages,
+    ...items.map((item) =>
+      createChatMessage(item.role, item.text, {
+        imageUri: item.imageUri,
+        recommendation: item.recommendation,
+        structuredResponse: item.structuredResponse
+      })
+    )
+  ];
 }

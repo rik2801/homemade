@@ -16,16 +16,32 @@ function ChevronLeft({ color }: { color: string }) {
   );
 }
 
+function ChatHistoryIcon({ color }: { color: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      <Path d="M8 9h8" />
+      <Path d="M8 13h5" />
+    </Svg>
+  );
+}
+
 export function BrandHeader() {
   const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
   const activeTab = useAppStore((state) => state.activeTab);
   const exitArchie = useAppStore((state) => state.exitArchie);
+  const openArchieSidebar = useAppStore((state) => state.openArchieSidebar);
   const isArchie = activeTab === "archie";
 
   async function handleBack() {
     await Haptics.selectionAsync();
     exitArchie();
+  }
+
+  async function handleOpenChats() {
+    await Haptics.selectionAsync();
+    openArchieSidebar();
   }
 
   return (
@@ -50,7 +66,15 @@ export function BrandHeader() {
             <ChevronLeft color={colors.text} />
           </Pressable>
           <ArchieLogo align="center" height={36} style={styles.logo} />
-          <View style={styles.backSpacer} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open chat list"
+            hitSlop={8}
+            onPress={handleOpenChats}
+            style={styles.backButton}
+          >
+            <ChatHistoryIcon color={colors.text} />
+          </Pressable>
         </View>
       ) : (
         <HomemadeLogo align="center" height={36} />

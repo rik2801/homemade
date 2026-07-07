@@ -79,9 +79,8 @@ function TabBarBottomVignette({ color, height, width }: { color: string; height:
   );
 }
 
-function tabIconTint(tab: TabIconType, active: boolean, brandOnBrand: string, tabInactive: string) {
-  if (!active) return tabInactive;
-  return brandOnBrand;
+function tabIconTint(active: boolean, brandOnBrand: string, text: string) {
+  return active ? brandOnBrand : text;
 }
 
 function TabIcon({ type, color }: { type: TabIconType; color: string }) {
@@ -157,35 +156,22 @@ export function BottomTabBar() {
   const bottomOffset = tabBarBottomOffset(insets.bottom);
   const vignetteHeight = bottomOffset + TAB_ISLAND_HEIGHT + TAB_BAR_VIGNETTE_EXTRA;
   const isArchie = activeTab === "archie";
-  const hideDistance = TAB_ISLAND_HEIGHT + bottomOffset + spacing.xxl;
-  const shellTranslateY = useSharedValue(isArchie ? hideDistance : 0);
 
-  useEffect(() => {
-    shellTranslateY.value = withSpring(isArchie ? hideDistance : 0, {
-      dampingRatio: 1,
-      duration: 320
-    });
-  }, [hideDistance, isArchie, shellTranslateY]);
-
-  const slideStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: shellTranslateY.value }]
-  }));
+  if (isArchie) {
+    return null;
+  }
 
   return (
     <>
-      <Animated.View
+      <View
         pointerEvents="none"
-        style={[
-          styles.vignetteShell,
-          slideStyle,
-          { height: vignetteHeight, width: windowWidth }
-        ]}
+        style={[styles.vignetteShell, { height: vignetteHeight, width: windowWidth }]}
       >
         <TabBarBottomVignette color={colors.background} height={vignetteHeight} width={windowWidth} />
-      </Animated.View>
+      </View>
       <Animated.View
-        pointerEvents={isArchie ? "none" : "box-none"}
-        style={[styles.shell, slideStyle, { bottom: bottomOffset, width: windowWidth }]}
+        pointerEvents="box-none"
+        style={[styles.shell, { bottom: bottomOffset, width: windowWidth }]}
       >
         <View
           style={[
@@ -197,15 +183,13 @@ export function BottomTabBar() {
           ]}
         >
           <View style={[styles.island, { width: islandWidth }]}>
-            {activeTab !== "archie" ? (
-              <Animated.View
-                pointerEvents="none"
-                style={[styles.activeIndicator, indicatorStyle, styles.activeIndicatorDefault]}
-              />
-            ) : null}
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.activeIndicator, indicatorStyle, styles.activeIndicatorDefault]}
+            />
             {tabs.map((tab, index) => {
-              const active = activeTab === tab.key && tab.key !== "archie";
-              const tint = tabIconTint(tab.icon, active, colors.brandOnBrand, colors.tabInactive);
+              const active = activeTab === tab.key;
+              const tint = tabIconTint(active, colors.brandOnBrand, colors.text);
               const slotLeft = tabSlotLeft(index, tabWidth, islandWidth);
 
               return (

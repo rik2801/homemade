@@ -9,19 +9,34 @@ function matchesUserHas(userHas: string, ...options: string[]) {
   return options.some((option) => normalized.includes(option));
 }
 
-function buildHeavyCreamFallback(request: SubstituteRequest): SubstituteResponse["recommendation"] {
-  const { userHas, ingredientToReplace } = request;
-  const benefits = ["Lower fat", "Low sodium", "Creamy texture"];
+function findStepIndexFor(request: SubstituteRequest): number {
+  const name = request.ingredientToReplace.name.toLowerCase();
+  return request.recipe.steps.findIndex((step) => step.toLowerCase().includes(name));
+}
+
+function buildCreamFallback(request: SubstituteRequest): SubstituteResponse["recommendation"] {
+  const { userHas } = request;
+  const benefits = ["Lower fat", "Creamy texture"];
+  const stepIndex = findStepIndexFor(request);
 
   if (matchesUserHas(userHas, "yogurt", "greek")) {
     return {
       name: "Greek yogurt + milk",
       amount: "1/2 cup Greek yogurt + 2 tbsp milk",
-      whyThisWorks: "Keeps the soup creamy while reducing saturated fat.",
+      whyThisWorks: "Keeps the dish creamy while reducing saturated fat.",
       dietaryFit: "Fits low-fat and low-sodium goals.",
       recipeImpact: "Lower heat before stirring it in to prevent curdling.",
       confidence: "High",
-      updatedStep: "Reduce heat to low. Stir in Greek yogurt and milk until creamy; do not boil.",
+      stepUpdates:
+        stepIndex >= 0
+          ? [
+              {
+                stepIndex,
+                text: "Reduce heat to low. Stir in Greek yogurt and milk until creamy; do not boil.",
+                reason: "Yogurt curdles at a boil"
+              }
+            ]
+          : undefined,
       benefits
     };
   }
@@ -50,14 +65,57 @@ function buildHeavyCreamFallback(request: SubstituteRequest): SubstituteResponse
     };
   }
 
+  return buildGenericFallback(request);
+}
+
+function buildAromaticFallback(request: SubstituteRequest): SubstituteResponse["recommendation"] {
+  const { userHas, ingredientToReplace } = request;
+  const trimmed = userHas.trim();
+  const isGarnishStyle = matchesUserHas(userHas, "spring onion", "green onion", "scallion", "chive");
+  const stepIndex = findStepIndexFor(request);
+  const lastStepIndex = request.recipe.steps.length - 1;
+
+  if (isGarnishStyle) {
+    return {
+      name: trimmed,
+      amount: `Use ${trimmed} to taste, added at the end`,
+      whyThisWorks: `${trimmed} are delicate — they shine as a fresh finish instead of being cooked down like ${ingredientToReplace.name}.`,
+      dietaryFit: "Light, fresh, and fits most dietary goals.",
+      recipeImpact: "Moves from the sauté stage to a garnish at the end of cooking.",
+      confidence: "Medium",
+      stepUpdates: [
+        ...(stepIndex >= 0
+          ? [
+              {
+                stepIndex,
+                text: request.recipe.steps[stepIndex].replace(
+                  new RegExp(ingredientToReplace.name, "i"),
+                  ""
+                )
+                  .replace(/\s{2,}/g, " ")
+                  .trim(),
+                reason: `${trimmed} should not be sautéed like ${ingredientToReplace.name}`
+              }
+            ]
+          : []),
+        {
+          stepIndex: lastStepIndex,
+          text: `${request.recipe.steps[lastStepIndex].replace(/\.$/, "")}. Top with sliced ${trimmed.toLowerCase()} before serving.`,
+          reason: "Added as a fresh garnish"
+        }
+      ],
+      benefits: ["Fresh flavor", "No cooking change needed"]
+    };
+  }
+
   return {
-    name: `${userHas.trim()} (adapted)`,
-    amount: `Use ${userHas.trim()} in the same amount as ${ingredientToReplace.name}, adjusted to taste`,
-    whyThisWorks: "Uses what you have on hand while keeping the recipe structure intact.",
-    dietaryFit: "Review sodium and fat content of your substitute against the recipe goals.",
-    recipeImpact: "Taste and texture may shift — adjust seasoning after swapping.",
+    name: trimmed,
+    amount: `Use ${trimmed} in a similar amount to ${ingredientToReplace.name}`,
+    whyThisWorks: "Fills the same aromatic role in the base of the dish.",
+    dietaryFit: "Check your substitute against the recipe's dietary goals.",
+    recipeImpact: "Cook until softened, the same as the original aromatic.",
     confidence: "Medium",
-    benefits
+    benefits: ["Similar role", "Pantry-friendly"]
   };
 }
 
@@ -71,15 +129,26 @@ function buildGenericFallback(request: SubstituteRequest): SubstituteResponse["r
     dietaryFit: "Check that your substitute fits the recipe's dietary goals.",
     recipeImpact: "Flavor and texture may change slightly.",
     confidence: "Medium",
-    benefits: ["Lower fat", "Low sodium"]
+    benefits: ["Pantry-friendly", "Keeps the dish on track"]
   };
 }
 
 export function buildFallbackResponse(request: SubstituteRequest): SubstituteResponse {
-  const recommendation =
-    request.ingredientToReplace.name.toLowerCase() === "heavy cream"
-      ? buildHeavyCreamFallback(request)
-      : buildGenericFallback(request);
+  const name = request.ingredientToReplace.name.toLowerCase();
+
+  let recommendation: SubstituteResponse["recommendation"];
+  if (name.includes("cream")) {
+    recommendation = buildCreamFallback(request);
+  } else if (
+    name.includes("onion") ||
+    name.includes("garlic") ||
+    name.includes("shallot") ||
+    name.includes("leek")
+  ) {
+    recommendation = buildAromaticFallback(request);
+  } else {
+    recommendation = buildGenericFallback(request);
+  }
 
   return {
     source: "fallback",

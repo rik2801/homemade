@@ -14,7 +14,7 @@ app.use(
     origin: allowedOrigin
   })
 );
-app.use(express.json({ limit: "256kb" }));
+app.use(express.json({ limit: "4mb" }));
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });

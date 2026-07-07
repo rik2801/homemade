@@ -1,4 +1,3 @@
-import { CREAM_STEP_GREEK_YOGURT_MILK, homemadeRecipe } from "@/features/recipe/data/homemadeRecipe";
 import type { PantryMode } from "@/features/preferences/data/preferenceOptions";
 import { findIngredientById } from "@/lib/swapFlow";
 import { formatDietaryFit } from "@/lib/preferences";
@@ -7,7 +6,7 @@ import {
   requestIngredientSubstitution,
   type SubstituteApiResponse
 } from "@/services/aiClient";
-import type { Ingredient, PendingSuggestion, Recipe } from "@/types/recipe";
+import type { ArchieStepUpdate, Ingredient, PendingSuggestion, Recipe } from "@/types/recipe";
 
 type RecommendationResult = {
   substituteItem: string;
@@ -21,109 +20,69 @@ type RecommendationResult = {
   source: "ai" | "fallback";
   benefits: string[];
   stepOverride?: string;
+  stepUpdates?: ArchieStepUpdate[];
   unavailableNotice?: boolean;
 };
 
-function normalizeUserHas(value: string) {
-  return value.trim().toLowerCase();
+type IngredientCategory = "cream" | "dairy" | "aromatic" | "herb" | "cheese" | "broth" | "oil" | "other";
+
+function categorizeIngredient(label: string): IngredientCategory {
+  const n = label.toLowerCase();
+  if (n.includes("cream")) return "cream";
+  if (n.includes("milk") || n.includes("yogurt") || n.includes("butter")) return "dairy";
+  if (n.includes("onion") || n.includes("garlic") || n.includes("shallot") || n.includes("leek")) {
+    return "aromatic";
+  }
+  if (n.includes("parsley") || n.includes("basil") || n.includes("cilantro") || n.includes("herb")) {
+    return "herb";
+  }
+  if (n.includes("parmesan") || n.includes("cheese")) return "cheese";
+  if (n.includes("broth") || n.includes("stock")) return "broth";
+  if (n.includes("oil")) return "oil";
+  return "other";
 }
 
-function matchesUserHas(userHas: string, ...options: string[]) {
-  const normalized = normalizeUserHas(userHas);
-  return options.some((option) => normalized.includes(option));
+/**
+ * Local quick-pick options shown as chips when the suggestion API is
+ * unavailable. Category-based, not ingredient-specific.
+ */
+export function getFallbackSubstituteOptions(ingredientLabel: string): string[] {
+  switch (categorizeIngredient(ingredientLabel)) {
+    case "cream":
+      return ["Greek yogurt", "Milk", "Coconut milk"];
+    case "dairy":
+      return ["Oat milk", "Coconut milk", "Greek yogurt"];
+    case "aromatic":
+      return ["Shallots", "Spring onions", "Leeks"];
+    case "herb":
+      return ["Dried herbs", "Fresh basil", "Chives"];
+    case "cheese":
+      return ["Nutritional yeast", "Pecorino", "Aged cheddar"];
+    case "broth":
+      return ["Bouillon cube + water", "Mushroom broth", "Water + soy sauce"];
+    case "oil":
+      return ["Butter", "Avocado oil", "Coconut oil"];
+    default:
+      return ["Something similar I have", "A pantry staple", "Skip it"];
+  }
 }
 
-function buildHeavyCreamRecommendation(userHas: string, forceFallback: boolean): RecommendationResult {
-  const benefits = ["Lower fat", "Low sodium", "Creamy texture"];
+function buildLocalRecommendation(
+  ingredient: Ingredient,
+  userHas: string,
+  forceFallback: boolean
+): RecommendationResult {
+  const benefits = ["Pantry-friendly", "Keeps the dish on track"];
 
   if (forceFallback) {
     return {
-      substituteItem: "Evaporated skim milk",
-      displayItem: "Evaporated skim milk",
-      recommendedUsage: "1/2 cup evaporated skim milk",
-      ratio: "Use 1/2 cup for 1/2 cup heavy cream",
-      why: "Keeps creaminess with lower fat and no added sodium.",
-      dietaryFit: "Fits low-fat and low-sodium goals.",
-      recipeImpact: "Simmer briefly after adding — less rich but still creamy.",
-      confidence: "High",
-      source: "fallback",
-      benefits,
-      unavailableNotice: true
-    };
-  }
-
-  if (matchesUserHas(userHas, "yogurt", "greek")) {
-    return {
-      substituteItem: "Greek yogurt + milk",
-      displayItem: "Greek yogurt + milk",
-      recommendedUsage: "1/2 cup Greek yogurt + 2 tbsp milk",
-      ratio: "1/2 cup Greek yogurt + 2 tbsp milk",
-      why: "Keeps the soup creamy while reducing saturated fat.",
-      dietaryFit: "Fits low-fat and low-sodium goals.",
-      recipeImpact: "Lower heat before stirring it in to prevent curdling.",
-      confidence: "High",
-      source: "ai",
-      benefits,
-      stepOverride: CREAM_STEP_GREEK_YOGURT_MILK
-    };
-  }
-
-  if (matchesUserHas(userHas, "milk")) {
-    return {
-      substituteItem: "Milk + cornstarch slurry",
-      displayItem: "Milk + cornstarch slurry",
-      recommendedUsage: "1/2 cup milk + 1 tbsp cornstarch slurry",
-      ratio: "1/2 cup milk whisked with 1 tbsp cornstarch slurry",
-      why: "Adds body without heavy cream while keeping the swap pantry-simple.",
-      dietaryFit: "Lower fat than heavy cream; choose unsalted milk if sodium is a concern.",
-      recipeImpact: "Whisk the slurry in off heat, then warm gently to thicken.",
-      confidence: "Medium",
-      source: "ai",
-      benefits
-    };
-  }
-
-  if (matchesUserHas(userHas, "coconut")) {
-    return {
-      substituteItem: "Coconut milk",
-      displayItem: "Coconut milk",
-      recommendedUsage: "1/2 cup light coconut milk",
-      ratio: "Use 1/2 cup light coconut milk for 1/2 cup heavy cream",
-      why: "Adds richness and a smooth texture without dairy.",
-      dietaryFit: "Can fit low-sodium goals if you choose an unsweetened can.",
-      recipeImpact: "Works for texture, but changes flavor.",
-      confidence: "Medium",
-      source: "ai",
-      benefits
-    };
-  }
-
-  return {
-    substituteItem: `${userHas.trim()} (adapted)`,
-    displayItem: userHas.trim(),
-    recommendedUsage: `Use ${userHas.trim()} in the same amount as heavy cream, adjusted to taste`,
-    ratio: `Substitute ${userHas.trim()} for heavy cream in equal volume where possible`,
-    why: "Uses what you told Archie you have on hand while keeping the recipe structure intact.",
-    dietaryFit: "Review sodium and fat content of your substitute against the recipe goals.",
-    recipeImpact: "Taste and texture may shift — adjust seasoning after swapping.",
-    confidence: "Medium",
-    source: "ai",
-    benefits
-  };
-}
-
-function buildGenericRecommendation(ingredient: Ingredient, userHas: string, forceFallback: boolean): RecommendationResult {
-  const benefits = ["Lower fat", "Low sodium"];
-
-  if (forceFallback) {
-    return {
-      substituteItem: "Guideline-safe alternative",
-      displayItem: "Guideline-safe alternative",
+      substituteItem: `${userHas.trim() || "A guideline-safe alternative"}`,
+      displayItem: userHas.trim() || "Guideline-safe alternative",
       recommendedUsage: ingredient.amount,
-      ratio: ingredient.amount,
-      why: "Meets dietary guidelines for this recipe.",
-      dietaryFit: "Fits low-fat and low-sodium goals.",
-      recipeImpact: "Adjust seasoning after swapping.",
+      ratio: `Use in the same amount as ${ingredient.label} where possible`,
+      why: "Rule-based suggestion while AI is unavailable — keeps the recipe workable.",
+      dietaryFit: "Review sodium and fat content of your substitute against the recipe goals.",
+      recipeImpact: "Taste and texture may shift — adjust seasoning after swapping.",
       confidence: "Medium",
       source: "fallback",
       benefits,
@@ -140,21 +99,9 @@ function buildGenericRecommendation(ingredient: Ingredient, userHas: string, for
     dietaryFit: "Check that your substitute fits the recipe's dietary goals.",
     recipeImpact: "Flavor and texture may change slightly.",
     confidence: "Medium",
-    source: "ai",
+    source: "fallback",
     benefits
   };
-}
-
-function buildLocalRecommendation(
-  ingredient: Ingredient,
-  userHas: string,
-  forceFallback: boolean
-): RecommendationResult {
-  if (ingredient.label === "heavy cream") {
-    return buildHeavyCreamRecommendation(userHas, forceFallback);
-  }
-
-  return buildGenericRecommendation(ingredient, userHas, forceFallback);
 }
 
 function apiResponseToRecommendation(response: SubstituteApiResponse): RecommendationResult {
@@ -171,7 +118,8 @@ function apiResponseToRecommendation(response: SubstituteApiResponse): Recommend
     confidence: recommendation.confidence,
     source,
     benefits: recommendation.benefits,
-    stepOverride: recommendation.updatedStep
+    stepOverride: recommendation.updatedStep,
+    stepUpdates: recommendation.stepUpdates
   };
 }
 
@@ -199,6 +147,7 @@ function toPendingSuggestion(
     source: result.source,
     benefits: result.benefits,
     stepOverride: result.stepOverride,
+    stepUpdates: result.stepUpdates,
     unavailableNotice: result.unavailableNotice
   };
 }
@@ -210,12 +159,17 @@ type PreferenceContext = {
   pantryMode: PantryMode;
 };
 
+type SwapGenerationOptions = {
+  exclude?: string[];
+};
+
 export async function runSwapGeneration(
   recipe: Recipe,
   ingredientId: string,
   userHas: string,
   forceFallback: boolean,
-  preferences: PreferenceContext
+  preferences: PreferenceContext,
+  options?: SwapGenerationOptions
 ): Promise<PendingSuggestion> {
   const ingredient = findIngredientById(recipe, ingredientId);
   if (!ingredient) {
@@ -235,7 +189,7 @@ export async function runSwapGeneration(
   }
 
   try {
-    const payload = buildSubstituteApiRequest(recipe, ingredient, userHas, preferences);
+    const payload = buildSubstituteApiRequest(recipe, ingredient, userHas, preferences, options?.exclude);
     const response = await requestIngredientSubstitution(payload);
     const result = apiResponseToRecommendation(response);
     return toPendingSuggestion(
@@ -257,29 +211,4 @@ export async function runSwapGeneration(
       preferences.allergies
     );
   }
-}
-
-export function getAlternateSuggestion(
-  ingredientId: string,
-  userHas: string,
-  currentDisplayItem: string,
-  preferences: PreferenceContext
-): PendingSuggestion | null {
-  const ingredient = findIngredientById(homemadeRecipe, ingredientId);
-  if (!ingredient) return null;
-
-  if (ingredient.label !== "heavy cream") return null;
-
-  const altUserHas = matchesUserHas(userHas, "yogurt", "greek") ? "milk" : "Greek yogurt";
-  const alt = buildHeavyCreamRecommendation(altUserHas, false);
-
-  if (alt.displayItem === currentDisplayItem) return null;
-  return toPendingSuggestion(
-    ingredientId,
-    ingredient,
-    altUserHas,
-    alt,
-    preferences.dietaryGoals,
-    preferences.allergies
-  );
 }

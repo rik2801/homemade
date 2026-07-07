@@ -21,10 +21,18 @@ export function SwapRecommendationCard({ suggestion }: SwapRecommendationCardPro
   const cancelSuggestion = useAppStore((state) => state.cancelSuggestion);
   const requestAnotherOption = useAppStore((state) => state.requestAnotherOption);
   const selectedIngredientId = useAppStore((state) => state.selectedIngredientId);
+  const anotherOptionLoading = useAppStore((state) => state.anotherOptionLoading);
 
   const isApplying = applyPhase === "loading";
   const isSuccess = applyPhase === "success";
   const isFallback = suggestion.source === "fallback";
+  const stepUpdatesText = suggestion.stepUpdates?.length
+    ? suggestion.stepUpdates
+        .map((update) => `Step ${update.stepIndex + 1}: ${update.text}`)
+        .join("\n\n")
+    : suggestion.stepOverride
+      ? `Updated step: ${suggestion.stepOverride}`
+      : null;
   const icon = selectedIngredientId
     ? iconKeyForLabel(suggestion.displayItem, "herb")
     : iconKeyForLabel(suggestion.displayItem, "yogurt");
@@ -90,6 +98,11 @@ export function SwapRecommendationCard({ suggestion }: SwapRecommendationCardPro
         <TrustSection label="Why this works" value={suggestion.why} />
         {suggestion.dietaryFit ? <TrustSection label="Dietary fit" value={suggestion.dietaryFit} /> : null}
         {suggestion.recipeImpact ? <TrustSection label="Recipe impact" value={suggestion.recipeImpact} /> : null}
+        {stepUpdatesText ? (
+          <TrustSection label="Steps updated" value={stepUpdatesText} />
+        ) : (
+          <TrustSection label="Instructions" value="No instruction changes needed." />
+        )}
         {suggestion.confidence ? <TrustSection label="Confidence" value={suggestion.confidence} /> : null}
 
         <View style={styles.benefits}>
@@ -121,11 +134,15 @@ export function SwapRecommendationCard({ suggestion }: SwapRecommendationCardPro
             <View style={styles.secondaryRow}>
               <PressableScale
                 accessibilityRole="button"
-                disabled={isApplying}
+                disabled={isApplying || anotherOptionLoading}
                 onPress={handleAnotherOption}
                 style={[styles.secondaryBtn, { borderColor: colors.border }]}
               >
-                <AppText style={[styles.secondaryLabel, { color: colors.brandOnBrand }]}>Another option</AppText>
+                {anotherOptionLoading ? (
+                  <ActivityIndicator color={colors.brandOnBrand} size="small" />
+                ) : (
+                  <AppText style={[styles.secondaryLabel, { color: colors.brandOnBrand }]}>Another option</AppText>
+                )}
               </PressableScale>
               <PressableScale
                 accessibilityRole="button"

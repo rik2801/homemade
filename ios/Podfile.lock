@@ -192,6 +192,10 @@ PODS:
     - ExpoModulesCore
   - ExpoHaptics (57.0.0):
     - ExpoModulesCore
+  - ExpoImageManipulator (57.0.2):
+    - ExpoModulesCore
+  - ExpoImagePicker (57.0.2):
+    - ExpoModulesCore
   - ExpoKeepAwake (57.0.0):
     - ExpoModulesCore
   - ExpoLinking (57.0.1):
@@ -2485,6 +2489,8 @@ DEPENDENCIES:
   - ExpoFont (from `../node_modules/expo-font/ios/ExpoFont.podspec`)
   - ExpoGlassEffect (from `../node_modules/expo-glass-effect/ios`)
   - ExpoHaptics (from `../node_modules/expo-haptics/ios`)
+  - ExpoImageManipulator (from `../node_modules/expo-image-manipulator/ios/ExpoImageManipulator.podspec`)
+  - ExpoImagePicker (from `../node_modules/expo-image-picker/ios`)
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
   - ExpoLinking (from `../node_modules/expo-linking/ios`)
   - "ExpoLogBox (from `../node_modules/@expo/log-box`)"
@@ -2612,6 +2618,10 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-glass-effect/ios"
   ExpoHaptics:
     :path: "../node_modules/expo-haptics/ios"
+  ExpoImageManipulator:
+    :podspec: "../node_modules/expo-image-manipulator/ios/ExpoImageManipulator.podspec"
+  ExpoImagePicker:
+    :path: "../node_modules/expo-image-picker/ios"
   ExpoKeepAwake:
     :path: "../node_modules/expo-keep-awake/ios"
   ExpoLinking:
@@ -2818,6 +2828,8 @@ SPEC CHECKSUMS:
   ExpoFont: 35fd7ad72f697d3a9656545909972d8b9f60d5da
   ExpoGlassEffect: 72e96f2f6cae69f970238b80656d869d1a9a98ff
   ExpoHaptics: c6d063c3bfda1c1d6d7fdf237ffb612c4fc09954
+  ExpoImageManipulator: ff3ced92b541af9561e94867cbba949e68af6de2
+  ExpoImagePicker: 27f4e9a5d797abc31c75237362f90ac012d1a8fe
   ExpoKeepAwake: 8a96e2075b75641001f55393d7e6600a5b808f09
   ExpoLinking: db6d7a9e9348cca9ada7c39127ab30963deddba3
   ExpoLogBox: b39a76aab749833d58111c3be1264bb90f3b92d4

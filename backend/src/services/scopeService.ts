@@ -19,6 +19,8 @@ const IN_SCOPE_PATTERNS = [
   /\b(avoid|why should|why avoid|should i avoid|bacon|sausage|pork|red meat|processed meat)\b/i,
   /\b(what are|tell me about|explain|help me understand|based on my)\b/i,
   /\b(can i eat|can i have|is it ok|is it okay|should i eat|what about|how about|is .+ safe|safe to eat|safe for me)\b/i,
+  /\b(good addition|would this|would it|work in|work with|add to|use in|use this)\b/i,
+  /\b(photo|picture|image|what's in|what is in|identify)\b/i,
   /\b(crab|shrimp|lobster|shellfish|prawn|scallop|mussel|clam|oyster|salmon|tuna|cod|tilapia|beef|turkey|ham|peanut|tree nut|almond|wheat|soy|sesame)\b/i
 ];
 
@@ -54,9 +56,19 @@ function isNutritionFollowUp(message: string, history: ChatHistoryTurn[]) {
   return threadWasRecipeNutrition(history) && shortFollowUp;
 }
 
-export function isRecipeNutritionInScope(message: string, history: ChatHistoryTurn[] = []) {
+export function isRecipeNutritionInScope(
+  message: string,
+  history: ChatHistoryTurn[] = [],
+  hasImage = false
+) {
   const normalized = message.trim();
-  if (normalized.length < 2) return false;
+  if (normalized.length < 2 && !hasImage) return false;
+
+  if (hasImage) {
+    const clearlyOutOfScope = OUT_OF_SCOPE_PATTERNS.some((pattern) => pattern.test(normalized));
+    if (clearlyOutOfScope) return false;
+    return true;
+  }
 
   const clearlyOutOfScope = OUT_OF_SCOPE_PATTERNS.some((pattern) => pattern.test(normalized));
   const clearlyInScope = IN_SCOPE_PATTERNS.some((pattern) => pattern.test(normalized));

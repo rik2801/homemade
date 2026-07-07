@@ -1,14 +1,12 @@
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/primitives/AppText";
-import { ArchieMascotAvatar, MASCOT_LIFT, MASCOT_SIZE } from "@/components/archie/ArchieMascotAvatar";
+import { ArchieMascotAvatar } from "@/components/archie/ArchieMascotAvatar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { fontFamily } from "@/theme/typography";
 import { radius, spacing } from "@/theme/spacing";
 
 export { ARCHIE_MASCOT_IMAGE } from "@/components/archie/ArchieMascotAvatar";
-
-const CONTENT_LIFT = MASCOT_SIZE * 0.15;
 
 export type ArchieQuickAction = {
   id: string;
@@ -82,14 +80,11 @@ const styles = StyleSheet.create({
     width: "100%"
   },
   mascotWrap: {
-    marginBottom: -MASCOT_LIFT,
-    transform: [{ translateY: -MASCOT_LIFT }]
+    alignItems: "center"
   },
   contentWrap: {
     alignItems: "center",
     gap: spacing.md,
-    marginBottom: -CONTENT_LIFT,
-    transform: [{ translateY: -CONTENT_LIFT }],
     width: "100%"
   },
   headline: {

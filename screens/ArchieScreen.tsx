@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Image, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { archieComposerScrollInset } from "@/components/archie/ArchieComposer";
@@ -8,6 +8,7 @@ import {
   ArchieEmptyState,
   archieEmptyStateDefaults
 } from "@/components/archie/ArchieEmptyState";
+import { ArchieStructuredResponseCard } from "@/components/archie/ArchieStructuredResponseCard";
 import { ArchieProgressCard } from "@/components/archie/ArchieProgressCard";
 import { IngredientPickerCards } from "@/components/archie/IngredientPickerCards";
 import { RecipePickerCards } from "@/components/archie/RecipePickerCards";
@@ -16,6 +17,7 @@ import { AppText } from "@/components/primitives/AppText";
 import { SwapRecommendationCard } from "@/components/swap/SwapRecommendationCard";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { appendChatMessages } from "@/lib/archieChat";
+import { formatAssistantMessage, resolveMessageStructuredResponse } from "@/lib/mapArchieStructuredResponse";
 import { runSwapGeneration } from "@/services/assistantService";
 import { useAppStore } from "@/store/useAppStore";
 import { fontFamily } from "@/theme/typography";
@@ -57,8 +59,15 @@ export function ArchieScreen() {
   const conversationOpacity = useSharedValue(showWelcome ? 0 : 1);
 
   useEffect(() => {
-    emptyOpacity.value = withTiming(showWelcome ? 1 : 0, { duration: 280 });
-    conversationOpacity.value = withTiming(showWelcome ? 0 : 1, { duration: 280 });
+    const nextEmpty = showWelcome ? 1 : 0;
+    const nextConversation = showWelcome ? 0 : 1;
+
+    if (emptyOpacity.value !== nextEmpty) {
+      emptyOpacity.value = withTiming(nextEmpty, { duration: 280 });
+    }
+    if (conversationOpacity.value !== nextConversation) {
+      conversationOpacity.value = withTiming(nextConversation, { duration: 280 });
+    }
   }, [conversationOpacity, emptyOpacity, showWelcome]);
 
   useEffect(() => {
@@ -96,6 +105,7 @@ export function ArchieScreen() {
     }, 580);
 
     let cancelled = false;
+    const sessionAtStart = useAppStore.getState().activeSessionId;
 
     runSwapGeneration(recipe, selectedIngredientId, userHasSubstitute, fallbackMode, {
       dietaryGoals,
@@ -104,13 +114,20 @@ export function ArchieScreen() {
       pantryMode
     }).then((suggestion) => {
       if (cancelled) return;
+      // Session changed mid-generation — never write into the wrong chat.
+      if (useAppStore.getState().activeSessionId !== sessionAtStart) return;
       clearInterval(interval);
       setProgressStep(3);
       setPendingSuggestion(suggestion);
+      const formatted = formatAssistantMessage(
+        `Try ${suggestion.displayItem} (${suggestion.recommendedUsage}). ${suggestion.why}`,
+        { source: suggestion.source === "fallback" ? "fallback" : "ai" }
+      );
       useAppStore.setState((state) => ({
         chatMessages: appendChatMessages(state.chatMessages, {
           role: "assistant",
-          text: `Try ${suggestion.displayItem} (${suggestion.recommendedUsage}). ${suggestion.why}`
+          text: formatted.text,
+          ...(formatted.structuredResponse ? { structuredResponse: formatted.structuredResponse } : {})
         })
       }));
       setAssistantPhase("suggestion");
@@ -178,7 +195,10 @@ export function ArchieScreen() {
     opacity: conversationOpacity.value
   }));
 
-  const composerInset = archieComposerScrollInset(insets.bottom);
+  const composerInset = useMemo(
+    () => archieComposerScrollInset(Math.round(insets.bottom)),
+    [insets.bottom]
+  );
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.brandSoft }]}>
@@ -212,28 +232,57 @@ export function ArchieScreen() {
           ]}
           style={styles.conversationScroll}
         >
-          {chatMessages.map((message) => (
-            <View
-              key={message.id}
-              style={[
-                styles.bubble,
-                message.role === "user" ? styles.userBubble : styles.assistBubble,
-                {
-                  backgroundColor: message.role === "user" ? colors.brand : colors.canvas
-                }
-              ]}
-            >
-              <AppText
-                muted={message.role === "assistant"}
-                style={[
-                  message.role === "user" ? styles.userText : styles.intro,
-                  message.role === "user" ? { color: colors.brandOnBrand } : undefined
-                ]}
-              >
-                {message.text}
-              </AppText>
-            </View>
-          ))}
+          {chatMessages.map((message, index) => {
+            const priorUserMessage = chatMessages
+              .slice(0, index)
+              .reverse()
+              .find((item) => item.role === "user");
+
+            const structuredResponse =
+              message.role === "assistant"
+                ? resolveMessageStructuredResponse(message, {
+                    hasImage: Boolean(priorUserMessage?.imageUri),
+                    userMessage: priorUserMessage?.text
+                  })
+                : null;
+
+            if (message.role === "assistant" && structuredResponse) {
+              return (
+                <View key={message.id} style={styles.messageGroup}>
+                  <ArchieStructuredResponseCard {...structuredResponse} />
+                </View>
+              );
+            }
+
+            return (
+              <View key={message.id} style={styles.messageGroup}>
+                <View
+                  style={[
+                    styles.bubble,
+                    message.role === "user" ? styles.userBubble : styles.assistBubble,
+                    {
+                      backgroundColor: message.role === "user" ? colors.brand : colors.canvas
+                    }
+                  ]}
+                >
+                  {message.imageUri ? (
+                    <Image source={{ uri: message.imageUri }} style={styles.messageImage} />
+                  ) : null}
+                  {message.text ? (
+                    <AppText
+                      muted={message.role === "assistant"}
+                      style={[
+                        message.role === "user" ? styles.userText : styles.intro,
+                        message.role === "user" ? { color: colors.brandOnBrand } : undefined
+                      ]}
+                    >
+                      {message.text}
+                    </AppText>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })}
 
           {assistantPhase === "pick_recipe" ? (
             <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
@@ -286,8 +335,8 @@ const styles = StyleSheet.create({
   emptyLayer: {
     ...StyleSheet.absoluteFill,
     alignItems: "center",
-    justifyContent: "center",
-    transform: [{ translateY: -28 }],
+    justifyContent: "flex-start",
+    paddingTop: spacing.xl,
     zIndex: 1
   },
   conversationLayer: {
@@ -303,6 +352,9 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     paddingHorizontal: layout.screenPadding,
     paddingTop: 4
+  },
+  messageGroup: {
+    gap: spacing.sm
   },
   bubble: {
     borderRadius: 20,
@@ -328,6 +380,12 @@ const styles = StyleSheet.create({
     fontFamily,
     fontSize: 11,
     lineHeight: 16
+  },
+  messageImage: {
+    borderRadius: radius.md,
+    height: 120,
+    marginBottom: spacing.sm,
+    width: 160
   },
   appliedCard: {
     borderRadius: radius.lg,

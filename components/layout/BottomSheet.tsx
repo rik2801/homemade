@@ -10,10 +10,11 @@ type BottomSheetProps = {
   visible: boolean;
   onClose: () => void;
   title: string;
+  subtitle?: string;
   children: ReactNode;
 };
 
-export function BottomSheet({ visible, onClose, title, children }: BottomSheetProps) {
+export function BottomSheet({ visible, onClose, title, subtitle, children }: BottomSheetProps) {
   const { colors } = useAppTheme();
   const { height } = useWindowDimensions();
   const translateY = useSharedValue(height);
@@ -64,7 +65,14 @@ export function BottomSheet({ visible, onClose, title, children }: BottomSheetPr
           >
             <View style={[styles.handle, { backgroundColor: colors.borderLight }]} />
             <View style={styles.header}>
-              <Animated.Text style={[styles.title, { color: colors.text }]}>{title}</Animated.Text>
+              <View style={styles.headerCopy}>
+                <Animated.Text style={[styles.title, { color: colors.text }]}>{title}</Animated.Text>
+                {subtitle ? (
+                  <Animated.Text style={[styles.subtitle, { color: colors.muted }]}>
+                    {subtitle}
+                  </Animated.Text>
+                ) : null}
+              </View>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Close"
@@ -107,16 +115,24 @@ const styles = StyleSheet.create({
     width: 46
   },
   header: {
-    alignItems: "center",
+    alignItems: "flex-start",
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: spacing.md
   },
-  title: {
+  headerCopy: {
     flex: 1,
+    gap: 4,
+    paddingRight: spacing.sm
+  },
+  title: {
     fontSize: 17,
     fontWeight: "600",
     letterSpacing: -0.3
+  },
+  subtitle: {
+    fontSize: 13,
+    lineHeight: 18
   },
   closeButton: {
     alignItems: "center",

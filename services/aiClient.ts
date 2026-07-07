@@ -1,5 +1,5 @@
 import type { PantryMode } from "@/features/preferences/data/preferenceOptions";
-import type { Ingredient, Recipe } from "@/types/recipe";
+import type { ArchieStepUpdate, Ingredient, Recipe } from "@/types/recipe";
 
 export type SubstituteApiRequest = {
   recipe: {
@@ -17,6 +17,7 @@ export type SubstituteApiRequest = {
   allergies: string[];
   cookingFor: string;
   pantryMode: PantryMode;
+  exclude?: string[];
 };
 
 export type SubstituteApiResponse = {
@@ -33,13 +34,38 @@ export type SubstituteApiResponse = {
     dietaryFit: string;
     recipeImpact: string;
     confidence: "High" | "Medium" | "Low";
+    /** @deprecated Use stepUpdates */
     updatedStep?: string;
+    stepUpdates?: ArchieStepUpdate[];
     benefits: string[];
   };
 };
 
+export type SuggestSubstitutesApiRequest = {
+  recipe: {
+    id: string;
+    title: string;
+    ingredients: Array<{ id?: string; amount: string; label: string }>;
+    steps: string[];
+  };
+  ingredientToReplace: {
+    name: string;
+    amount: string;
+  };
+  dietaryGoals: string[];
+  allergies: string[];
+  cookingFor: string;
+};
+
+export type SuggestSubstitutesApiResponse = {
+  source: "ai" | "fallback";
+  suggestions: Array<{ label: string; shortReason: string }>;
+};
+
 export type ChatApiRequest = {
   message: string;
+  imageDataUrl?: string;
+  imageFilename?: string;
   history: Array<{ role: "user" | "assistant"; content: string }>;
   recipe: {
     id: string;
@@ -53,10 +79,20 @@ export type ChatApiRequest = {
   pantryMode: PantryMode;
 };
 
+export type ChatImageRecommendation = {
+  verdict: string;
+  detectedIngredient: string;
+  howToUse: string;
+  dietaryFit: string;
+  watchOut: string;
+  recipeStepUpdate: string;
+};
+
 export type ChatApiResponse = {
-  source: "ai" | "fallback" | "declined";
+  source: "ai" | "fallback" | "declined" | "demo";
   reply: string;
   inScope: boolean;
+  recommendation?: ChatImageRecommendation;
 };
 
 function getApiBaseUrl() {
@@ -65,6 +101,19 @@ function getApiBaseUrl() {
     throw new Error("EXPO_PUBLIC_API_BASE_URL is not configured");
   }
   return baseUrl.replace(/\/$/, "");
+}
+
+function serializeRecipe(recipe: Recipe) {
+  return {
+    id: recipe.id,
+    title: recipe.title,
+    ingredients: recipe.ingredients.map((item) => ({
+      id: item.id,
+      amount: item.amount,
+      label: item.label
+    })),
+    steps: recipe.steps
+  };
 }
 
 export function buildSubstituteApiRequest(
@@ -76,19 +125,11 @@ export function buildSubstituteApiRequest(
     allergies: string[];
     cookingFor: string;
     pantryMode: PantryMode;
-  }
+  },
+  exclude?: string[]
 ): SubstituteApiRequest {
   return {
-    recipe: {
-      id: recipe.id,
-      title: recipe.title,
-      ingredients: recipe.ingredients.map((item) => ({
-        id: item.id,
-        amount: item.amount,
-        label: item.label
-      })),
-      steps: recipe.steps
-    },
+    recipe: serializeRecipe(recipe),
     ingredientToReplace: {
       name: ingredient.label,
       amount: ingredient.amount
@@ -97,7 +138,8 @@ export function buildSubstituteApiRequest(
     dietaryGoals: preferences.dietaryGoals,
     allergies: preferences.allergies,
     cookingFor: preferences.cookingFor,
-    pantryMode: preferences.pantryMode
+    pantryMode: preferences.pantryMode,
+    ...(exclude?.length ? { exclude } : {})
   };
 }
 
@@ -118,6 +160,42 @@ export async function requestIngredientSubstitution(
   }
 
   return response.json() as Promise<SubstituteApiResponse>;
+}
+
+export async function requestSubstituteSuggestions(
+  recipe: Recipe,
+  ingredient: Ingredient,
+  preferences: {
+    dietaryGoals: string[];
+    allergies: string[];
+    cookingFor: string;
+  }
+): Promise<SuggestSubstitutesApiResponse> {
+  const payload: SuggestSubstitutesApiRequest = {
+    recipe: serializeRecipe(recipe),
+    ingredientToReplace: {
+      name: ingredient.label,
+      amount: ingredient.amount
+    },
+    dietaryGoals: preferences.dietaryGoals,
+    allergies: preferences.allergies,
+    cookingFor: preferences.cookingFor
+  };
+
+  const response = await fetch(`${getApiBaseUrl()}/api/ai/suggest-substitutes`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Suggest substitutes API failed (${response.status})`);
+  }
+
+  return response.json() as Promise<SuggestSubstitutesApiResponse>;
 }
 
 export async function requestArchieChat(payload: ChatApiRequest): Promise<ChatApiResponse> {

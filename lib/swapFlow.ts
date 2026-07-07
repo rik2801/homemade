@@ -1,11 +1,11 @@
-import type { Ingredient, PendingSuggestion, Recipe, SubstitutionRecord } from "@/types/recipe";
+import type {
+  ArchieStepUpdate,
+  Ingredient,
+  PendingSuggestion,
+  Recipe,
+  SubstitutionRecord
+} from "@/types/recipe";
 import type { UserPreferences } from "@/features/preferences/data/preferenceOptions";
-import {
-  CREAM_STEP_GREEK_YOGURT_MILK,
-  CREAM_STEP_INDEX,
-  CREAM_STEP_YOGURT,
-  homemadeRecipe
-} from "@/features/recipe/data/homemadeRecipe";
 
 export function findIngredientById(recipe: Recipe, id: string): Ingredient | undefined {
   return recipe.ingredients.find((item) => item.id === id);
@@ -20,11 +20,11 @@ export function resolveIngredientIdFromText(recipe: Recipe, text: string): strin
   const t = text.trim().toLowerCase();
   if (!t) return null;
 
-  if (t.includes("heavy cream")) return findIngredientIdByLabel(recipe, "heavy cream");
-  if (t.includes("salt")) return findIngredientIdByLabel(recipe, "salt");
-  if (t.includes("lower sodium") || t.includes("low sodium")) {
-    return findIngredientIdByLabel(recipe, "salt");
-  }
+  const isSubstitutionQuestion =
+    /\b(will this|would this|can this|could this|is this|good for|work as|replacement for|substitute for|instead of|addition to|add to)\b/i.test(
+      text
+    );
+  if (isSubstitutionQuestion) return null;
 
   if (t.includes("swap") || t.includes("replace") || t.includes("don't have") || t.includes("do not have")) {
     for (const ingredient of recipe.ingredients) {
@@ -62,32 +62,63 @@ export function iconKeyForLabel(label: string, fallback: Ingredient["icon"]): In
   return fallback;
 }
 
-export function getDisplayStep(
-  step: string,
-  index: number,
-  ingredientId: string,
+function isValidStepUpdate(update: ArchieStepUpdate, stepCount: number): boolean {
+  return (
+    Number.isInteger(update.stepIndex) &&
+    update.stepIndex >= 0 &&
+    update.stepIndex < stepCount &&
+    update.text.trim().length > 0
+  );
+}
+
+/**
+ * Builds the stepIndex → text override map for an accepted suggestion.
+ * Prefers structured stepUpdates from the AI; falls back to locating the
+ * legacy single updatedStep next to the original ingredient mention.
+ */
+export function resolveStepOverrides(
+  recipe: Recipe,
+  ingredient: Ingredient,
+  suggestion: PendingSuggestion
+): Record<number, string> | undefined {
+  const overrides: Record<number, string> = {};
+
+  if (suggestion.stepUpdates?.length) {
+    for (const update of suggestion.stepUpdates) {
+      if (isValidStepUpdate(update, recipe.steps.length)) {
+        overrides[update.stepIndex] = update.text.trim();
+      }
+    }
+  } else if (suggestion.stepOverride) {
+    const label = ingredient.label.toLowerCase();
+    const index = recipe.steps.findIndex((step) => step.toLowerCase().includes(label));
+    if (index >= 0) {
+      overrides[index] = suggestion.stepOverride;
+    }
+  }
+
+  return Object.keys(overrides).length > 0 ? overrides : undefined;
+}
+
+/**
+ * Maps recipe steps through every applied substitution's stepOverrides.
+ * When two substitutions touch the same step, the last-applied one wins
+ * (object insertion order of the substitution map).
+ */
+export function applyStepOverrides(
+  recipe: Recipe,
   appliedSubstitutions: Record<string, SubstitutionRecord>
-): string {
-  if (index !== CREAM_STEP_INDEX || !appliedSubstitutions[ingredientId]) {
-    return step;
-  }
-
-  const sub = appliedSubstitutions[homemadeRecipe.substitutionIngredientId];
-  if (!sub) return step;
-
-  if (sub.stepOverride) {
-    return sub.stepOverride;
-  }
-
-  if (sub.currentItem.toLowerCase().includes("yogurt") && sub.currentItem.toLowerCase().includes("milk")) {
-    return CREAM_STEP_GREEK_YOGURT_MILK;
-  }
-
-  if (sub.currentItem.toLowerCase().includes("yogurt")) {
-    return CREAM_STEP_YOGURT;
-  }
-
-  return `Remove from heat, stir in ${sub.currentItem.toLowerCase()}, then warm gently without boiling.`;
+): string[] {
+  return recipe.steps.map((step, index) => {
+    let result = step;
+    for (const record of Object.values(appliedSubstitutions)) {
+      const override = record.stepOverrides?.[index];
+      if (override) {
+        result = override;
+      }
+    }
+    return result;
+  });
 }
 
 export function buildPromptPreview(
@@ -115,31 +146,11 @@ export function getProgressLabels(
 ): string[] {
   if (context === "conversation" && targetRecipeTitle) {
     return [
-    `Reading ${targetRecipeTitle}`,
-    "Checking low-fat + low-sodium guidelines",
-    "Matching your available substitute"
-  ];
+      `Reading ${targetRecipeTitle}`,
+      "Checking your dietary preferences",
+      "Matching your available substitute"
+    ];
   }
 
   return ["Reading recipe", "Checking dietary needs", "Matching your available substitute"];
-}
-
-export function buildSubstitutionRecord(
-  ingredient: Ingredient,
-  pending: PendingSuggestion
-): PendingSuggestion & { record: import("@/types/recipe").SubstitutionRecord } {
-  return {
-    ...pending,
-    record: {
-      id: ingredient.id,
-      originalItem: ingredient.label,
-      currentItem: pending.substituteItem,
-      originalAmount: ingredient.amount,
-      currentAmount: ingredient.amount,
-      substituted: true,
-      reason: pending.why,
-      ratio: pending.ratio,
-      source: pending.source
-    }
-  };
 }

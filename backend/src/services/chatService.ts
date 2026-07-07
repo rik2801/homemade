@@ -1,4 +1,5 @@
 import type { ChatRequest, ChatResponse } from "../types/ai";
+import { processImageMessage } from "./imagePipeline";
 import { CULINARY_SYSTEM_PROMPT, getGroqClient, getGroqModel } from "./groqClient";
 import { buildScopedDeclineReply, isRecipeNutritionInScope } from "./scopeService";
 
@@ -79,8 +80,9 @@ function profileFromRequest(request: ChatRequest) {
 
 export async function generateChatReply(request: ChatRequest): Promise<ChatResponse> {
   const profile = profileFromRequest(request);
+  const hasImage = Boolean(request.imageDataUrl);
 
-  if (!isRecipeNutritionInScope(request.message, request.history)) {
+  if (!isRecipeNutritionInScope(request.message, request.history, hasImage)) {
     console.info("[ai] chat declined — out of scope", {
       recipeId: request.recipe.id,
       messageLength: request.message.length
@@ -90,6 +92,15 @@ export async function generateChatReply(request: ChatRequest): Promise<ChatRespo
       reply: buildScopedDeclineReply(profile),
       inScope: false
     };
+  }
+
+  if (hasImage) {
+    const pipelineResponse = await processImageMessage(request);
+    console.info("[ai] image pipeline reply", {
+      recipeId: request.recipe.id,
+      source: pipelineResponse?.source
+    });
+    return pipelineResponse!;
   }
 
   const client = getGroqClient();
@@ -106,6 +117,7 @@ export async function generateChatReply(request: ChatRequest): Promise<ChatRespo
   }
 
   try {
+    const prompt = buildChatPrompt(request);
     const completion = await client.chat.completions.create({
       model: getGroqModel(),
       max_tokens: 512,
@@ -115,7 +127,7 @@ export async function generateChatReply(request: ChatRequest): Promise<ChatRespo
           role: "system",
           content: `${CULINARY_SYSTEM_PROMPT} You only discuss recipes, ingredients, cooking techniques, and general nutrition guidance including allergy-aware food questions. Never decline a follow-up about whether a specific food fits the user's diet or allergies. Politely decline only unrelated topics like weather, politics, or coding.`
         },
-        { role: "user", content: buildChatPrompt(request) }
+        { role: "user", content: prompt }
       ]
     });
 

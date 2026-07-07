@@ -1,38 +1,55 @@
 import { create } from "zustand";
-import {
-  getRecipeById,
-  homemadeRecipe,
-  isSwapDemoRecipe
-} from "@/features/recipe/data/homemadeRecipe";
+import { getRecipeById, homemadeRecipe } from "@/features/recipe/data/homemadeRecipe";
 import type { Recipe } from "@/types/recipe";
 import {
   DEFAULT_PREFERENCES,
   type PantryMode,
   type UserPreferences
 } from "@/features/preferences/data/preferenceOptions";
-import { findIngredientById, getDisplayStep, resolveIngredientIdFromText, userMessageFor } from "@/lib/swapFlow";
+import {
+  applyStepOverrides,
+  findIngredientById,
+  resolveIngredientIdFromText,
+  resolveStepOverrides,
+  userMessageFor
+} from "@/lib/swapFlow";
 import { appendChatMessages, ARCHIE_PROMPTS } from "@/lib/archieChat";
-import { getAlternateSuggestion } from "@/services/assistantService";
+import {
+  createSessionId,
+  loadPersistedSessions,
+  MAX_SESSIONS,
+  persistSessions,
+  pickEvictionCandidate,
+  pruneExpiredSessions
+} from "@/lib/archieSessionStorage";
+import { inferArchieIntent, messageNeedsRecipeContext } from "@/lib/inferArchieIntent";
+import { mapChatResponseToStructured } from "@/lib/mapArchieStructuredResponse";
+import { readImageAsDataUrl } from "@/lib/chatImage";
+import { runSwapGeneration } from "@/services/assistantService";
 import { requestArchieChat } from "@/services/aiClient";
 import type {
-  ArchieChatMessage,
+  AppliedSubstitutionsMap,
   ApplyPhase,
+  ArchieChatMessage,
+  ArchieChatSession,
+  ArchieLastApplied,
+  ArchieSessionKind,
+  ArchieSwapState,
   AssistantContext,
   AssistantPhase,
+  ComposerSheetMode,
   PendingSuggestion,
   SubstitutionRecord,
   TabName,
   RecipesView
 } from "@/types/recipe";
-import { UNKNOWN_INGREDIENT_MSG } from "@/types/recipe";
+import { UNKNOWN_INGREDIENT_MSG, ARCHIE_CHAT_ERROR_MSG } from "@/types/recipe";
 
 export type ProfileSheetMode = "cookingFor" | "dietaryGoals" | "allergies" | "pantryMode" | null;
 
-type LastApplied = {
-  ingredientId: string;
-  originalItem: string;
-  currentItem: string;
-};
+const EMPTY_SUBSTITUTIONS: Record<string, SubstitutionRecord> = {};
+
+const RESUMABLE_SWAP_PHASES: AssistantPhase[] = ["awaiting_substitute", "loading", "suggestion"];
 
 type AppState = {
   recipe: Recipe;
@@ -47,25 +64,33 @@ type AppState = {
   userSubstituteReply: string | null;
   composerFocusToken: number;
   archieComposerDraft: string;
-  appliedSubstitutions: Record<string, SubstitutionRecord>;
+  composerImageUri: string | null;
+  composerActiveRecipeId: string | null;
+  pendingComposerMessage: string | null;
+  composerSheetMode: ComposerSheetMode;
+  appliedSubstitutions: AppliedSubstitutionsMap;
   fallbackMode: boolean;
   swapSheetVisible: boolean;
   archSheetVisible: boolean;
   assistantContext: AssistantContext;
   assistantPhase: AssistantPhase;
   chatMessages: ArchieChatMessage[];
+  archieSessions: ArchieChatSession[];
+  activeSessionId: string | null;
+  archieSidebarOpen: boolean;
   userMessage: string;
   unknownHint: string | null;
   assistantReply: string | null;
   chatLoading: boolean;
   chatRequestId: number;
+  anotherOptionLoading: boolean;
   recipeConfirmation: string;
   ingredientConfirmation: string;
   targetRecipeId: string | null;
   pendingSuggestion: PendingSuggestion | null;
   progressStep: number;
   applyPhase: ApplyPhase;
-  lastApplied: LastApplied | null;
+  lastApplied: ArchieLastApplied | null;
   justAppliedId: string | null;
   toastMessage: string | null;
   onboardingCompleted: boolean;
@@ -85,6 +110,10 @@ type AppState = {
   closeSwapSheet: () => void;
   openArchSheet: () => void;
   closeArchSheet: () => void;
+  openArchieSidebar: () => void;
+  closeArchieSidebar: () => void;
+  switchSession: (sessionId: string) => void;
+  deleteSession: (sessionId: string) => void;
   toggleFallbackMode: () => void;
   selectIngredientForSwap: (ingredientId: string) => void;
   startSwap: (ingredientId: string, fromRecipe?: boolean) => void;
@@ -94,12 +123,22 @@ type AppState = {
   selectUserSubstitute: (userHas: string) => void;
   requestComposerFocus: () => void;
   setArchieComposerDraft: (text: string) => void;
+  openComposerImageSheet: () => void;
+  openComposerRecipeSheet: () => void;
+  closeComposerSheet: () => void;
+  setComposerImage: (uri: string | null) => void;
+  clearComposerAttachments: () => void;
+  selectComposerRecipe: (recipeId: string) => void;
+  clearComposerActiveRecipe: () => void;
+  requestRecipeContext: (message: string) => void;
+  submitComposerMessage: (text: string) => void;
   setAssistantPhase: (phase: AssistantPhase) => void;
   setProgressStep: (step: number) => void;
   setPendingSuggestion: (suggestion: PendingSuggestion | null) => void;
   cancelSuggestion: () => void;
   applySuggestion: () => void;
   requestAnotherOption: () => void;
+  sendArchieChat: (text: string, imageUri?: string) => void;
   submitAssistantInput: (text: string) => void;
   clearToast: () => void;
   hasSubstitution: (ingredientId: string) => boolean;
@@ -114,18 +153,20 @@ type AppState = {
   closeProfileSheet: () => void;
 };
 
-function buildDisplaySteps(recipe: Recipe, appliedSubstitutions: Record<string, SubstitutionRecord>) {
-  return recipe.steps.map((step, index) =>
-    getDisplayStep(step, index, recipe.substitutionIngredientId, appliedSubstitutions)
-  );
+function substitutionsForRecipe(applied: AppliedSubstitutionsMap, recipeId: string) {
+  return applied[recipeId] ?? EMPTY_SUBSTITUTIONS;
 }
 
-function loadRecipeState(recipe: Recipe, appliedSubstitutions: Record<string, SubstitutionRecord>) {
+function buildDisplaySteps(recipe: Recipe, substitutions: Record<string, SubstitutionRecord>) {
+  return applyStepOverrides(recipe, substitutions);
+}
+
+function loadRecipeState(recipe: Recipe, substitutions: Record<string, SubstitutionRecord>) {
   return {
     recipe,
     selectedRecipeId: recipe.id,
     baseSteps: [...recipe.steps],
-    displaySteps: buildDisplaySteps(recipe, appliedSubstitutions)
+    displaySteps: buildDisplaySteps(recipe, substitutions)
   };
 }
 
@@ -137,6 +178,127 @@ function resetSwapConversation() {
     progressStep: 0,
     applyPhase: null as ApplyPhase
   };
+}
+
+function blankSwapState(): ArchieSwapState {
+  return {
+    selectedIngredientId: null,
+    targetRecipeId: null,
+    userHasSubstitute: null,
+    userSubstituteReply: null,
+    pendingSuggestion: null,
+    assistantPhase: "idle",
+    assistantContext: "conversation",
+    recipeConfirmation: "",
+    ingredientConfirmation: "",
+    lastApplied: null
+  };
+}
+
+/** Root chat/swap fields reset applied when leaving or opening a session. */
+function resetChatRootState() {
+  return {
+    chatMessages: [] as ArchieChatMessage[],
+    ...blankSwapState(),
+    ...resetSwapConversation(),
+    chatLoading: false,
+    unknownHint: null,
+    assistantReply: null,
+    userMessage: "",
+    archieComposerDraft: "",
+    composerImageUri: null,
+    composerActiveRecipeId: null,
+    pendingComposerMessage: null,
+    composerSheetMode: null as ComposerSheetMode
+  };
+}
+
+function snapshotSwapState(state: AppState): ArchieSwapState {
+  return {
+    selectedIngredientId: state.selectedIngredientId,
+    targetRecipeId: state.targetRecipeId,
+    userHasSubstitute: state.userHasSubstitute,
+    userSubstituteReply: state.userSubstituteReply,
+    pendingSuggestion: state.pendingSuggestion,
+    assistantPhase: state.assistantPhase,
+    assistantContext: state.assistantContext,
+    recipeConfirmation: state.recipeConfirmation,
+    ingredientConfirmation: state.ingredientConfirmation,
+    lastApplied: state.lastApplied
+  };
+}
+
+function sessionHasUserMessages(session: ArchieChatSession) {
+  return session.messages.some((message) => message.role === "user");
+}
+
+function deriveSessionTitle(session: ArchieChatSession): string {
+  if (session.kind === "recipe_swap") {
+    const recipeTitle = session.recipeId ? getRecipeById(session.recipeId)?.title : null;
+    const recipe = session.recipeId ? getRecipeById(session.recipeId) : null;
+    const ingredientLabel =
+      recipe && session.ingredientId
+        ? findIngredientById(recipe, session.ingredientId)?.label
+        : null;
+    const prefix = session.swapState.assistantPhase === "applied" ? "Swapped" : "Swap";
+    if (ingredientLabel && recipeTitle) return `${prefix} ${ingredientLabel} · ${recipeTitle}`;
+    if (recipeTitle) return `${prefix} · ${recipeTitle}`;
+    return `${prefix} ingredient`;
+  }
+
+  const firstUserMessage = session.messages.find((message) => message.role === "user");
+  if (firstUserMessage?.text) {
+    const text = firstUserMessage.text.trim();
+    return text.length > 48 ? `${text.slice(0, 45)}…` : text;
+  }
+  return "New chat";
+}
+
+function createSessionRecord(
+  kind: ArchieSessionKind,
+  options?: {
+    recipeId?: string;
+    ingredientId?: string;
+    messages?: ArchieChatMessage[];
+    swapState?: ArchieSwapState;
+  }
+): ArchieChatSession {
+  const now = Date.now();
+  const session: ArchieChatSession = {
+    id: createSessionId(),
+    kind,
+    title: "New chat",
+    recipeId: options?.recipeId,
+    ingredientId: options?.ingredientId,
+    messages: options?.messages ?? [],
+    swapState: options?.swapState ?? blankSwapState(),
+    createdAt: now,
+    lastAccessedAt: now
+  };
+  session.title = deriveSessionTitle(session);
+  return session;
+}
+
+/** Removes the given session from the list when it holds no user messages. */
+function dropSessionIfEmpty(sessions: ArchieChatSession[], sessionId: string | null) {
+  if (!sessionId) return sessions;
+  return sessions.filter(
+    (session) => session.id !== sessionId || sessionHasUserMessages(session)
+  );
+}
+
+/**
+ * Frees a slot when at capacity. Returns the trimmed list, or null when every
+ * session is protected from eviction (active or mid-generation).
+ */
+function makeRoomForSession(
+  sessions: ArchieChatSession[],
+  activeSessionId: string | null
+): ArchieChatSession[] | null {
+  if (sessions.length < MAX_SESSIONS) return sessions;
+  const candidate = pickEvictionCandidate(sessions, activeSessionId);
+  if (!candidate) return null;
+  return sessions.filter((session) => session.id !== candidate.id);
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -152,6 +314,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   userSubstituteReply: null,
   composerFocusToken: 0,
   archieComposerDraft: "",
+  composerImageUri: null,
+  composerActiveRecipeId: null,
+  pendingComposerMessage: null,
+  composerSheetMode: null,
   appliedSubstitutions: {},
   fallbackMode: false,
   swapSheetVisible: false,
@@ -159,11 +325,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   assistantContext: "conversation",
   assistantPhase: "idle",
   chatMessages: [],
+  archieSessions: [],
+  activeSessionId: null,
+  archieSidebarOpen: false,
   userMessage: "",
   unknownHint: null,
   assistantReply: null,
   chatLoading: false,
   chatRequestId: 0,
+  anotherOptionLoading: false,
   recipeConfirmation: "",
   ingredientConfirmation: "",
   targetRecipeId: null,
@@ -183,27 +353,74 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveTab: (tab) => {
     const current = get().activeTab;
+
+    if (tab === "archie" && current !== "archie") {
+      // Entering Archie from the tab bar always starts a brand-new general chat.
+      const state = get();
+      let sessions = dropSessionIfEmpty(
+        pruneExpiredSessions(state.archieSessions),
+        state.activeSessionId
+      );
+
+      const withRoom = makeRoomForSession(sessions, null);
+      if (!withRoom) {
+        // Every session is protected (mid-generation) — resume the latest instead.
+        const latest = [...sessions].sort((a, b) => b.lastAccessedAt - a.lastAccessedAt)[0];
+        set({
+          archieSessions: sessions,
+          activeTab: "archie",
+          returnTab: current,
+          toastMessage: "Chat limit reached — delete a chat to start a new one"
+        });
+        if (latest) get().switchSession(latest.id);
+        setTimeout(() => set({ toastMessage: null }), 2500);
+        return;
+      }
+
+      const session = createSessionRecord("general");
+      set({
+        ...resetChatRootState(),
+        archieSessions: [...withRoom, session],
+        activeSessionId: session.id,
+        archieSidebarOpen: false,
+        chatRequestId: state.chatRequestId + 1,
+        activeTab: "archie",
+        returnTab: current
+      });
+      return;
+    }
+
     set({
       activeTab: tab,
-      returnTab: tab === "archie" && current !== "archie" ? current : get().returnTab,
       recipesView: tab === "recipes" ? "list" : get().recipesView
     });
   },
 
-  exitArchie: () =>
+  exitArchie: () => {
+    const state = get();
+    const sessions = dropSessionIfEmpty(
+      pruneExpiredSessions(state.archieSessions),
+      state.activeSessionId
+    );
+
     set({
-      activeTab: get().returnTab,
-      archieComposerDraft: ""
-    }),
+      activeTab: state.returnTab,
+      archieSessions: sessions,
+      activeSessionId: null,
+      archieSidebarOpen: false,
+      chatRequestId: state.chatRequestId + 1,
+      ...resetChatRootState()
+    });
+  },
 
   openRecipe: (recipeId, options) => {
     const recipe = getRecipeById(recipeId);
     if (!recipe) return;
 
-    const appliedSubstitutions = isSwapDemoRecipe(recipeId) ? get().appliedSubstitutions : {};
+    const substitutions = substitutionsForRecipe(get().appliedSubstitutions, recipeId);
 
     set({
-      ...loadRecipeState(recipe, appliedSubstitutions),
+      ...loadRecipeState(recipe, substitutions),
       recipesView: options?.showDetail ? "detail" : get().recipesView,
       activeTab: "recipes"
     });
@@ -225,13 +442,80 @@ export const useAppStore = create<AppState>((set, get) => ({
   openArchSheet: () => set({ archSheetVisible: true }),
   closeArchSheet: () => set({ archSheetVisible: false }),
 
+  openArchieSidebar: () => set({ archieSidebarOpen: true }),
+  closeArchieSidebar: () => set({ archieSidebarOpen: false }),
+
+  switchSession: (sessionId) => {
+    const state = get();
+    if (sessionId === state.activeSessionId) {
+      set({ archieSidebarOpen: false });
+      return;
+    }
+
+    let sessions = pruneExpiredSessions(state.archieSessions);
+    const target = sessions.find((session) => session.id === sessionId);
+    if (!target) {
+      set({ archieSessions: sessions, archieSidebarOpen: false });
+      return;
+    }
+
+    sessions = dropSessionIfEmpty(sessions, state.activeSessionId);
+    const now = Date.now();
+    sessions = sessions.map((session) =>
+      session.id === sessionId ? { ...session, lastAccessedAt: now } : session
+    );
+
+    const sessionRecipeId = target.swapState.targetRecipeId ?? target.recipeId ?? null;
+    const sessionRecipe = sessionRecipeId ? getRecipeById(sessionRecipeId) : null;
+    const recipeState = sessionRecipe
+      ? loadRecipeState(
+          sessionRecipe,
+          substitutionsForRecipe(state.appliedSubstitutions, sessionRecipe.id)
+        )
+      : {};
+
+    set({
+      ...resetChatRootState(),
+      ...recipeState,
+      archieSessions: sessions,
+      activeSessionId: sessionId,
+      archieSidebarOpen: false,
+      chatRequestId: state.chatRequestId + 1,
+      chatMessages: target.messages,
+      ...target.swapState
+    });
+  },
+
+  deleteSession: (sessionId) => {
+    const state = get();
+    const remaining = state.archieSessions.filter((session) => session.id !== sessionId);
+
+    if (state.activeSessionId !== sessionId) {
+      set({ archieSessions: remaining });
+      return;
+    }
+
+    // Deleting the active chat drops the user into a fresh general chat.
+    const session = createSessionRecord("general");
+    set({
+      ...resetChatRootState(),
+      archieSessions: [...remaining, session],
+      activeSessionId: session.id,
+      chatRequestId: state.chatRequestId + 1
+    });
+  },
+
   toggleFallbackMode: () => set((state) => ({ fallbackMode: !state.fallbackMode })),
 
-  hasSubstitution: (ingredientId) => Boolean(get().appliedSubstitutions[ingredientId]),
+  hasSubstitution: (ingredientId) =>
+    Boolean(substitutionsForRecipe(get().appliedSubstitutions, get().recipe.id)[ingredientId]),
 
   refreshDisplaySteps: () =>
     set((state) => ({
-      displaySteps: buildDisplaySteps(state.recipe, state.appliedSubstitutions)
+      displaySteps: buildDisplaySteps(
+        state.recipe,
+        substitutionsForRecipe(state.appliedSubstitutions, state.recipe.id)
+      )
     })),
 
   selectIngredientForSwap: (ingredientId) => {
@@ -269,14 +553,109 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (get().assistantPhase === "loading") return;
 
     const { recipe } = get();
-    if (!isSwapDemoRecipe(recipe.id)) return;
-
     const ingredient = findIngredientById(recipe, ingredientId);
     if (!ingredient || get().hasSubstitution(ingredientId)) return;
 
     const currentTab = get().activeTab;
+
+    // Recipe context known while already chatting: stay in the current session.
+    if (fromRecipe && currentTab === "archie") {
+      const swapUserMessage = userMessageFor(ingredient);
+      set((state) => ({
+        selectedIngredientId: ingredientId,
+        ...resetSwapConversation(),
+        unknownHint: null,
+        assistantReply: null,
+        chatLoading: false,
+        recipeConfirmation: "",
+        ingredientConfirmation: "",
+        lastApplied: null,
+        assistantContext: "recipe" as AssistantContext,
+        chatMessages: appendChatMessages(
+          state.chatMessages,
+          { role: "user", text: swapUserMessage },
+          { role: "assistant", text: ARCHIE_PROMPTS.pickSubstitute }
+        ),
+        userMessage: swapUserMessage,
+        targetRecipeId: recipe.id,
+        assistantPhase: "awaiting_substitute" as AssistantPhase
+      }));
+      return;
+    }
+
+    // Entry from the recipe screen: isolated recipe-swap session.
+    if (fromRecipe) {
+      const state = get();
+      let sessions = dropSessionIfEmpty(
+        pruneExpiredSessions(state.archieSessions),
+        state.activeSessionId
+      );
+
+      // Resume an in-flight swap chat for this exact recipe + ingredient.
+      const resumable = sessions.find(
+        (session) =>
+          session.kind === "recipe_swap" &&
+          session.recipeId === recipe.id &&
+          session.ingredientId === ingredientId &&
+          RESUMABLE_SWAP_PHASES.includes(session.swapState.assistantPhase)
+      );
+
+      if (resumable) {
+        set({ archieSessions: sessions });
+        get().switchSession(resumable.id);
+        set({
+          activeTab: "archie",
+          returnTab: currentTab !== "archie" ? currentTab : get().returnTab
+        });
+        return;
+      }
+
+      const withRoom = makeRoomForSession(sessions, null);
+      if (!withRoom) {
+        set({
+          archieSessions: sessions,
+          toastMessage: "Chat limit reached — delete a chat to start a new one"
+        });
+        setTimeout(() => set({ toastMessage: null }), 2500);
+        return;
+      }
+
+      const swapUserMessage = userMessageFor(ingredient);
+      const messages = appendChatMessages(
+        [],
+        { role: "user", text: swapUserMessage },
+        { role: "assistant", text: ARCHIE_PROMPTS.pickSubstitute }
+      );
+      const swapState: ArchieSwapState = {
+        ...blankSwapState(),
+        selectedIngredientId: ingredientId,
+        targetRecipeId: recipe.id,
+        assistantPhase: "awaiting_substitute",
+        assistantContext: "recipe"
+      };
+      const session = createSessionRecord("recipe_swap", {
+        recipeId: recipe.id,
+        ingredientId,
+        messages,
+        swapState
+      });
+
+      set({
+        ...resetChatRootState(),
+        ...swapState,
+        archieSessions: [...withRoom, session],
+        activeSessionId: session.id,
+        chatRequestId: state.chatRequestId + 1,
+        chatMessages: messages,
+        userMessage: swapUserMessage,
+        activeTab: "archie",
+        returnTab: currentTab !== "archie" ? currentTab : get().returnTab
+      });
+      return;
+    }
+
     const swapUserMessage = userMessageFor(ingredient);
-    const base = {
+    set((state) => ({
       selectedIngredientId: ingredientId,
       ...resetSwapConversation(),
       unknownHint: null,
@@ -285,28 +664,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       recipeConfirmation: "",
       ingredientConfirmation: "",
       lastApplied: null,
-      assistantContext: fromRecipe ? ("recipe" as AssistantContext) : ("conversation" as AssistantContext),
-      activeTab: "archie" as TabName,
-      returnTab: currentTab !== "archie" ? currentTab : get().returnTab
-    };
-
-    if (fromRecipe) {
-      set((state) => ({
-        ...base,
-        chatMessages: appendChatMessages(
-          state.chatMessages,
-          { role: "user", text: swapUserMessage },
-          { role: "assistant", text: ARCHIE_PROMPTS.pickSubstitute }
-        ),
-        userMessage: swapUserMessage,
-        targetRecipeId: recipe.id,
-        assistantPhase: "awaiting_substitute"
-      }));
-      return;
-    }
-
-    set((state) => ({
-      ...base,
+      assistantContext: "conversation" as AssistantContext,
       chatMessages: appendChatMessages(
         state.chatMessages,
         { role: "user", text: swapUserMessage },
@@ -314,7 +672,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       ),
       userMessage: swapUserMessage,
       targetRecipeId: null,
-      assistantPhase: "pick_recipe"
+      assistantPhase: "pick_recipe" as AssistantPhase,
+      activeTab: "archie" as TabName,
+      returnTab: currentTab !== "archie" ? currentTab : get().returnTab
     }));
   },
 
@@ -323,11 +683,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!recipe) return;
 
     const selectedIngredientId = get().selectedIngredientId;
-    const appliedSubstitutions = isSwapDemoRecipe(recipeId) ? get().appliedSubstitutions : {};
+    const substitutions = substitutionsForRecipe(get().appliedSubstitutions, recipeId);
 
     if (!selectedIngredientId) {
       set((state) => ({
-        ...loadRecipeState(recipe, appliedSubstitutions),
+        ...loadRecipeState(recipe, substitutions),
         chatMessages: appendChatMessages(
           state.chatMessages,
           { role: "user", text: recipe.title },
@@ -343,7 +703,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     set((state) => ({
-      ...loadRecipeState(recipe, appliedSubstitutions),
+      ...loadRecipeState(recipe, substitutions),
       chatMessages: appendChatMessages(
         state.chatMessages,
         { role: "user", text: recipe.title },
@@ -396,23 +756,114 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setArchieComposerDraft: (text) => set({ archieComposerDraft: text }),
 
+  openComposerImageSheet: () => {
+    if (get().assistantPhase === "loading") return;
+    set({ composerSheetMode: "image-source" });
+  },
+
+  openComposerRecipeSheet: () => {
+    if (get().assistantPhase === "loading") return;
+    set({ composerSheetMode: "recipe-picker" });
+  },
+
+  closeComposerSheet: () => set({ composerSheetMode: null }),
+
+  setComposerImage: (uri) => set({ composerImageUri: uri }),
+
+  clearComposerAttachments: () => set({ composerImageUri: null }),
+
+  clearComposerActiveRecipe: () => set({ composerActiveRecipeId: null }),
+
+  selectComposerRecipe: (recipeId) => {
+    const recipe = getRecipeById(recipeId);
+    if (!recipe) return;
+
+    const substitutions = substitutionsForRecipe(get().appliedSubstitutions, recipeId);
+    const pendingMessage = get().pendingComposerMessage;
+
+    set({
+      ...loadRecipeState(recipe, substitutions),
+      composerActiveRecipeId: recipeId,
+      composerSheetMode: null,
+      targetRecipeId: recipeId,
+      assistantContext: "recipe",
+      assistantPhase: "idle",
+      pendingComposerMessage: null
+    });
+
+    get().requestComposerFocus();
+
+    if (pendingMessage) {
+      get().submitAssistantInput(pendingMessage);
+    }
+  },
+
+  requestRecipeContext: (message) => {
+    set((state) => ({
+      pendingComposerMessage: message,
+      composerSheetMode: "recipe-picker",
+      userMessage: message,
+      chatMessages: appendChatMessages(
+        state.chatMessages,
+        { role: "user", text: message },
+        { role: "assistant", text: "Which recipe should I use?" }
+      )
+    }));
+  },
+
+  submitComposerMessage: (rawText) => {
+    const text = rawText.trim();
+    const imageUri = get().composerImageUri;
+    if (!text && !imageUri) return;
+
+    const messageText = text || "What's in this photo?";
+    const imageUriToSend = imageUri;
+
+    if (imageUriToSend) {
+      set({ composerImageUri: null });
+    }
+
+    const phase = get().assistantPhase;
+    if (phase === "loading" || phase === "pick_recipe" || phase === "pick_ingredient") return;
+    if (get().chatLoading) return;
+
+    if (imageUriToSend) {
+      get().sendArchieChat(messageText, imageUriToSend);
+      return;
+    }
+
+    get().submitAssistantInput(messageText);
+  },
+
   setAssistantPhase: (phase) => set({ assistantPhase: phase }),
   setProgressStep: (step) => set({ progressStep: step }),
   setPendingSuggestion: (suggestion) => set({ pendingSuggestion: suggestion }),
 
   cancelSuggestion: () => {
-    const wasRecipeFlow = get().assistantContext === "recipe";
+    const state = get();
+    const wasRecipeFlow = state.assistantContext === "recipe";
 
     if (wasRecipeFlow) {
+      // Mark the swap session cancelled so a future swap starts fresh.
+      const sessions = pruneExpiredSessions(state.archieSessions).map((session) =>
+        session.id === state.activeSessionId
+          ? {
+              ...session,
+              swapState: {
+                ...session.swapState,
+                assistantPhase: "idle" as AssistantPhase,
+                pendingSuggestion: null,
+                selectedIngredientId: null
+              }
+            }
+          : session
+      );
+
       set({
-        ...resetSwapConversation(),
-        assistantPhase: "idle",
-        userMessage: "",
-        recipeConfirmation: "",
-        ingredientConfirmation: "",
-        targetRecipeId: null,
-        assistantContext: "conversation",
-        selectedIngredientId: null,
+        ...resetChatRootState(),
+        archieSessions: sessions,
+        activeSessionId: null,
+        chatRequestId: state.chatRequestId + 1,
         activeTab: "recipes"
       });
       return;
@@ -447,17 +898,22 @@ export const useAppStore = create<AppState>((set, get) => ({
         reason: pendingSuggestion.why,
         ratio: pendingSuggestion.ratio,
         source: pendingSuggestion.source,
-        stepOverride: pendingSuggestion.stepOverride
+        stepOverride: pendingSuggestion.stepOverride,
+        stepOverrides: resolveStepOverrides(recipe, ingredient, pendingSuggestion)
       };
 
-      const appliedSubstitutions = {
-        ...get().appliedSubstitutions,
+      const recipeSubstitutions = {
+        ...substitutionsForRecipe(get().appliedSubstitutions, recipe.id),
         [ingredient.id]: record
+      };
+      const appliedSubstitutions: AppliedSubstitutionsMap = {
+        ...get().appliedSubstitutions,
+        [recipe.id]: recipeSubstitutions
       };
 
       set({
         appliedSubstitutions,
-        displaySteps: buildDisplaySteps(recipe, appliedSubstitutions),
+        displaySteps: buildDisplaySteps(recipe, recipeSubstitutions),
         lastApplied: {
           ingredientId: ingredient.id,
           originalItem: ingredient.label,
@@ -487,23 +943,137 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   requestAnotherOption: () => {
-    const { pendingSuggestion, selectedIngredientId, userHasSubstitute } = get();
-    if (!pendingSuggestion || !selectedIngredientId || !userHasSubstitute) return;
-
-    const alt = getAlternateSuggestion(
+    const {
+      pendingSuggestion,
       selectedIngredientId,
       userHasSubstitute,
-      pendingSuggestion.displayItem,
+      recipe,
+      anotherOptionLoading,
+      activeSessionId
+    } = get();
+    if (!pendingSuggestion || !selectedIngredientId || !userHasSubstitute || anotherOptionLoading) {
+      return;
+    }
+
+    set({ anotherOptionLoading: true });
+
+    void runSwapGeneration(
+      recipe,
+      selectedIngredientId,
+      userHasSubstitute,
+      get().fallbackMode,
       {
         dietaryGoals: get().dietaryGoals,
         allergies: get().allergies,
         cookingFor: get().cookingFor,
         pantryMode: get().pantryMode
+      },
+      { exclude: [pendingSuggestion.displayItem] }
+    )
+      .then((alt) => {
+        if (get().activeSessionId !== activeSessionId) return;
+        if (alt.displayItem === pendingSuggestion.displayItem) {
+          set({
+            anotherOptionLoading: false,
+            toastMessage: "That's the best match for what you have"
+          });
+          setTimeout(() => set({ toastMessage: null }), 2000);
+          return;
+        }
+        set({ pendingSuggestion: alt, anotherOptionLoading: false });
+      })
+      .catch(() => {
+        if (get().activeSessionId !== activeSessionId) return;
+        set({
+          anotherOptionLoading: false,
+          toastMessage: "Couldn't fetch another option right now"
+        });
+        setTimeout(() => set({ toastMessage: null }), 2000);
+      });
+  },
+
+  sendArchieChat: (text, imageUri) => {
+    const { recipe, chatMessages, activeSessionId } = get();
+    const requestId = get().chatRequestId + 1;
+    const nextMessages = appendChatMessages(chatMessages, {
+      role: "user",
+      text,
+      ...(imageUri ? { imageUri } : {})
+    });
+
+    set({
+      chatMessages: nextMessages,
+      userMessage: text,
+      unknownHint: null,
+      assistantReply: null,
+      chatLoading: true,
+      chatRequestId: requestId,
+      assistantPhase: "idle",
+      archieComposerDraft: ""
+    });
+
+    void (async () => {
+      const imageDataUrl = imageUri ? await readImageAsDataUrl(imageUri) : undefined;
+      const imageFilename = imageUri ? imageUri.split("/").pop() : undefined;
+
+      const isStale = () =>
+        get().chatRequestId !== requestId || get().activeSessionId !== activeSessionId;
+
+      try {
+        const response = await requestArchieChat({
+          message: text,
+          imageDataUrl: imageDataUrl ?? undefined,
+          imageFilename,
+          history: nextMessages.slice(0, -1).map((item) => ({
+            role: item.role,
+            content: item.text
+          })),
+          recipe: {
+            id: recipe.id,
+            title: recipe.title,
+            ingredients: recipe.ingredients.map((item) => ({
+              id: item.id,
+              amount: item.amount,
+              label: item.label
+            })),
+            steps: recipe.steps
+          },
+          dietaryGoals: get().dietaryGoals,
+          allergies: get().allergies,
+          cookingFor: get().cookingFor,
+          pantryMode: get().pantryMode
+        });
+
+        if (isStale()) return;
+
+        const structuredResponse = mapChatResponseToStructured(response, {
+          userMessage: text,
+          recipeTitle: recipe.title,
+          source: response.source,
+          hasImage: Boolean(imageUri)
+        });
+
+        set((state) => ({
+          chatLoading: false,
+          assistantReply: null,
+          chatMessages: appendChatMessages(state.chatMessages, {
+            role: "assistant",
+            text: structuredResponse ? "" : response.reply,
+            ...(structuredResponse ? { structuredResponse } : {})
+          })
+        }));
+      } catch {
+        if (isStale()) return;
+        set((state) => ({
+          chatLoading: false,
+          assistantReply: null,
+          chatMessages: appendChatMessages(state.chatMessages, {
+            role: "assistant",
+            text: imageUri ? ARCHIE_CHAT_ERROR_MSG : UNKNOWN_INGREDIENT_MSG
+          })
+        }));
       }
-    );
-    if (alt) {
-      set({ pendingSuggestion: alt });
-    }
+    })();
   },
 
   submitAssistantInput: (rawText) => {
@@ -532,69 +1102,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    const { recipe, chatMessages } = get();
-    const ingredientId = resolveIngredientIdFromText(recipe, text);
-    if (!ingredientId) {
-      const requestId = get().chatRequestId + 1;
-      const nextMessages = appendChatMessages(chatMessages, { role: "user", text });
-
-      set({
-        chatMessages: nextMessages,
-        userMessage: text,
-        unknownHint: null,
-        assistantReply: null,
-        chatLoading: true,
-        chatRequestId: requestId,
-        assistantPhase: "idle"
-      });
-
-      void requestArchieChat({
-        message: text,
-        history: nextMessages.slice(0, -1).map((item) => ({
-          role: item.role,
-          content: item.text
-        })),
-        recipe: {
-          id: recipe.id,
-          title: recipe.title,
-          ingredients: recipe.ingredients.map((item) => ({
-            id: item.id,
-            amount: item.amount,
-            label: item.label
-          })),
-          steps: recipe.steps
-        },
-        dietaryGoals: get().dietaryGoals,
-        allergies: get().allergies,
-        cookingFor: get().cookingFor,
-        pantryMode: get().pantryMode
-      })
-        .then((response) => {
-          if (get().chatRequestId !== requestId) return;
-          set((state) => ({
-            chatLoading: false,
-            assistantReply: null,
-            chatMessages: appendChatMessages(state.chatMessages, {
-              role: "assistant",
-              text: response.reply
-            })
-          }));
-        })
-        .catch(() => {
-          if (get().chatRequestId !== requestId) return;
-          set((state) => ({
-            chatLoading: false,
-            assistantReply: null,
-            chatMessages: appendChatMessages(state.chatMessages, {
-              role: "assistant",
-              text: UNKNOWN_INGREDIENT_MSG
-            })
-          }));
-        });
+    if (!get().composerActiveRecipeId && messageNeedsRecipeContext(text)) {
+      get().requestRecipeContext(text);
       return;
     }
 
-    get().startSwap(ingredientId, false);
+    const intent = inferArchieIntent(text);
+    const { recipe } = get();
+
+    if (intent === "recipe_alteration" || intent === "substitution") {
+      const ingredientId = resolveIngredientIdFromText(recipe, text);
+      if (ingredientId) {
+        get().startSwap(ingredientId, Boolean(get().composerActiveRecipeId));
+        return;
+      }
+      get().sendArchieChat(text);
+      return;
+    }
+
+    get().sendArchieChat(text);
   },
 
   clearToast: () => set({ toastMessage: null }),
@@ -629,3 +1155,61 @@ export const useAppStore = create<AppState>((set, get) => ({
 }));
 
 export const useRecipeStore = useAppStore;
+
+// --- Session sync + persistence -------------------------------------------
+
+/**
+ * Mirrors the live chat/swap root state into the active session record so the
+ * sidebar, resume logic, and persistence always see the current conversation.
+ * Runs on every store update, but only writes when chat-relevant fields moved.
+ */
+useAppStore.subscribe((state, prevState) => {
+  const chatFieldsChanged =
+    state.chatMessages !== prevState.chatMessages ||
+    state.assistantPhase !== prevState.assistantPhase ||
+    state.assistantContext !== prevState.assistantContext ||
+    state.pendingSuggestion !== prevState.pendingSuggestion ||
+    state.selectedIngredientId !== prevState.selectedIngredientId ||
+    state.targetRecipeId !== prevState.targetRecipeId ||
+    state.userHasSubstitute !== prevState.userHasSubstitute ||
+    state.lastApplied !== prevState.lastApplied;
+
+  if (chatFieldsChanged && state.activeSessionId) {
+    const index = state.archieSessions.findIndex(
+      (session) => session.id === state.activeSessionId
+    );
+    if (index >= 0) {
+      const current = state.archieSessions[index];
+      const updated: ArchieChatSession = {
+        ...current,
+        messages: state.chatMessages,
+        swapState: snapshotSwapState(state),
+        lastAccessedAt: Date.now()
+      };
+      updated.title = deriveSessionTitle(updated);
+
+      const sessions = [...state.archieSessions];
+      sessions[index] = updated;
+      useAppStore.setState({ archieSessions: sessions });
+      return;
+    }
+  }
+
+  if (state.archieSessions !== prevState.archieSessions) {
+    persistSessions(state.archieSessions);
+  }
+});
+
+void loadPersistedSessions().then((persisted) => {
+  if (persisted.length === 0) return;
+
+  // Merge behind any sessions created before hydration finished.
+  useAppStore.setState((state) => {
+    const liveIds = new Set(state.archieSessions.map((session) => session.id));
+    const merged = [
+      ...persisted.filter((session) => !liveIds.has(session.id)),
+      ...state.archieSessions
+    ];
+    return { archieSessions: merged.slice(-MAX_SESSIONS) };
+  });
+});

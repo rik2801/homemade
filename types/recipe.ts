@@ -23,6 +23,12 @@ export type Ingredient = {
   swappable?: boolean;
 };
 
+export type ArchieStepUpdate = {
+  stepIndex: number;
+  text: string;
+  reason?: string;
+};
+
 export type SubstitutionRecord = {
   id: string;
   originalItem: string;
@@ -33,22 +39,17 @@ export type SubstitutionRecord = {
   reason: string;
   ratio: string;
   source: "ai" | "fallback";
+  /** @deprecated Use stepOverrides */
   stepOverride?: string;
+  stepOverrides?: Record<number, string>;
 };
+
+/** Applied substitutions keyed by recipe id, then ingredient id. */
+export type AppliedSubstitutionsMap = Record<string, Record<string, SubstitutionRecord>>;
 
 export type NutritionMacro = {
   label: string;
   value: string;
-};
-
-export type SubstitutionOption = {
-  id: string;
-  replacement: string;
-  amount: string;
-  whyItWorks: string;
-  dietaryFit: string;
-  recipeImpact: string;
-  confidence: "High" | "Medium" | "Low";
 };
 
 export type Recipe = {
@@ -62,10 +63,6 @@ export type Recipe = {
   safetyNotes: string[];
   ingredients: Ingredient[];
   steps: string[];
-  substitutionIngredientId: string;
-  substitutionStepIndex: number;
-  substitutionStepOriginal: string;
-  substitutionOptions: SubstitutionOption[];
   nutrition: {
     perServing: boolean;
     macros: NutritionMacro[];
@@ -87,15 +84,48 @@ export type PendingSuggestion = {
   confidence?: "High" | "Medium" | "Low";
   source: "ai" | "fallback";
   benefits: string[];
+  /** @deprecated Use stepUpdates */
   stepOverride?: string;
+  stepUpdates?: ArchieStepUpdate[];
   unavailableNotice?: boolean;
+};
+
+export type ArchieResponseTitle = "Archie's recommendation" | "Archie's answer" | "Archie's note";
+
+export type ArchieStructuredResponse = {
+  title: ArchieResponseTitle;
+  summary: string;
+  isImageResponse?: boolean;
+  identified?: string;
+  howToUse?: string;
+  dietaryFit?: string;
+  watchOut?: string;
+  recipeUpdate?: string;
+  whyThisWorks?: string;
+  nutritionNote?: string;
+  nextStep?: string;
+};
+
+export type ArchieImageRecommendation = {
+  verdict: string;
+  detectedIngredient: string;
+  howToUse: string;
+  dietaryFit: string;
+  watchOut: string;
+  recipeStepUpdate: string;
 };
 
 export type ArchieChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  imageUri?: string;
+  /** @deprecated Use structuredResponse */
+  recommendation?: ArchieImageRecommendation;
+  structuredResponse?: ArchieStructuredResponse;
 };
+
+export type ComposerSheetMode = "image-source" | "recipe-picker" | null;
 
 export type AssistantContext = "recipe" | "conversation";
 
@@ -122,5 +152,41 @@ export type RecipeCatalogItem = {
   available: boolean;
 };
 
+export type ArchieSessionKind = "general" | "recipe_swap";
+
+export type ArchieLastApplied = {
+  ingredientId: string;
+  originalItem: string;
+  currentItem: string;
+};
+
+export type ArchieSwapState = {
+  selectedIngredientId: string | null;
+  targetRecipeId: string | null;
+  userHasSubstitute: string | null;
+  userSubstituteReply: string | null;
+  pendingSuggestion: PendingSuggestion | null;
+  assistantPhase: AssistantPhase;
+  assistantContext: AssistantContext;
+  recipeConfirmation: string;
+  ingredientConfirmation: string;
+  lastApplied: ArchieLastApplied | null;
+};
+
+export type ArchieChatSession = {
+  id: string;
+  kind: ArchieSessionKind;
+  title: string;
+  recipeId?: string;
+  ingredientId?: string;
+  messages: ArchieChatMessage[];
+  swapState: ArchieSwapState;
+  createdAt: number;
+  lastAccessedAt: number;
+};
+
 export const UNKNOWN_INGREDIENT_MSG =
-  "I can help with ingredients from Creamy Tomato Soup. Try heavy cream, salt, onion, vegetable broth, or garlic.";
+  "I had trouble reaching Archie for that one. Check your connection and try again.";
+
+export const ARCHIE_CHAT_ERROR_MSG =
+  "I couldn't reach Archie right now. Check your connection and try again.";
