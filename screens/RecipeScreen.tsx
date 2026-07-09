@@ -1,8 +1,10 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { AppText } from "@/components/primitives/AppText";
+import { floatingTabBarScrollInset } from "@/components/layout/BottomTabBar";
 import { IngredientIcon } from "@/components/recipe/IngredientIcon";
 import { SoupHeroIllustration } from "@/components/recipe/SoupHeroIllustration";
 import type { RecipeId } from "@/features/recipe/data/homemadeRecipe";
@@ -21,6 +23,7 @@ const EMPTY_SUBSTITUTIONS: Record<string, SubstitutionRecord> = {};
 
 export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const recipe = useAppStore((state) => state.recipe);
   const setRecipesView = useAppStore((state) => state.setRecipesView);
@@ -60,7 +63,10 @@ export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
     <ScrollView
       ref={scrollRef}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: floatingTabBarScrollInset(insets.bottom) }
+      ]}
       style={{ backgroundColor: colors.background }}
     >
       {showBack ? (
@@ -222,7 +228,6 @@ function MacroItem({ label, value, isLast }: { label: string; value: string; isL
 
 const styles = StyleSheet.create({
   content: {
-    paddingBottom: spacing.xxl,
     paddingHorizontal: layout.screenPadding
   },
   backRow: {
