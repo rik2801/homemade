@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Text, type TextProps, StyleSheet } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { containsArchieWord, renderArchieTextChildren } from "@/lib/archieText";
 import { fontFamily } from "@/theme/typography";
 
 type AppTextProps = TextProps & {
@@ -12,20 +13,21 @@ type AppTextProps = TextProps & {
 export function AppText({ children, variant = "body", muted, style, ...props }: AppTextProps) {
   const { colors } = useAppTheme();
 
+  const textStyle = [
+    styles.base,
+    styles[variant],
+    { color: muted ? colors.muted : colors.text, fontFamily },
+    variant === "brand" ? { color: colors.text } : null,
+    variant === "section" ? { color: colors.muted } : null,
+    variant === "eyebrow" ? { color: colors.muted } : null,
+    style
+  ];
+
+  const shouldStyleArchie = typeof children === "string" && containsArchieWord(children);
+
   return (
-    <Text
-      {...props}
-      style={[
-        styles.base,
-        styles[variant],
-        { color: muted ? colors.muted : colors.text, fontFamily },
-        variant === "brand" ? { color: colors.text } : null,
-        variant === "section" ? { color: colors.muted } : null,
-        variant === "eyebrow" ? { color: colors.muted } : null,
-        style
-      ]}
-    >
-      {children}
+    <Text {...props} style={textStyle}>
+      {shouldStyleArchie ? renderArchieTextChildren(children, textStyle) : children}
     </Text>
   );
 }

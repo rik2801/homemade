@@ -4,6 +4,8 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useEffect } from "react";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { renderArchieTextChildren } from "@/lib/archieText";
+import { fontFamily } from "@/theme/typography";
 import { radius, spacing } from "@/theme/spacing";
 
 type BottomSheetProps = {
@@ -68,8 +70,8 @@ export function BottomSheet({ visible, onClose, title, subtitle, children }: Bot
               <View style={styles.headerCopy}>
                 <Animated.Text style={[styles.title, { color: colors.text }]}>{title}</Animated.Text>
                 {subtitle ? (
-                  <Animated.Text style={[styles.subtitle, { color: colors.muted }]}>
-                    {subtitle}
+                  <Animated.Text style={[styles.subtitle, { color: colors.muted, fontFamily }]}>
+                    {renderArchieTextChildren(subtitle, [styles.subtitle, { color: colors.muted, fontFamily }])}
                   </Animated.Text>
                 ) : null}
               </View>

@@ -1,11 +1,18 @@
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ImageBackground, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { AppText } from "@/components/primitives/AppText";
 import { HomemadeLogo } from "@/components/brand/HomemadeLogo";
+import { ArchieGradientBackground } from "@/components/onboarding/ArchieGradientBackground";
+import {
+  MEET_ARCHIE_CONTINUE_DELAY_MS,
+  MEET_ARCHIE_REVEAL_FADE_MS,
+  MeetArchieOnboardingStep
+} from "@/components/onboarding/MeetArchieOnboardingStep";
 import {
   ALLERGY_OPTIONS,
   COOKING_FOR_OPTIONS,
@@ -25,20 +32,82 @@ const ONBOARDING_TEXT = "#FFFFFF";
 const ONBOARDING_TEXT_MUTED = "rgba(255, 255, 255, 0.78)";
 const ONBOARDING_CHIP_BORDER = "rgba(255, 255, 255, 0.38)";
 const ONBOARDING_CHIP_FROST_TINT = "rgba(255, 255, 255, 0.18)";
+const ONBOARDING_DISPLAY_STEP_COUNT = 3;
+const ONBOARDING_STEP_COUNT = ONBOARDING_DISPLAY_STEP_COUNT;
 
-type OnboardingStep = 0 | 1 | 2;
+type OnboardingStep = 0 | 1 | 2 | 3;
+
+function onboardingProgressLabel(step: OnboardingStep): string | null {
+  if (step === 2) return null;
+  if (step === 3) return `3 of ${ONBOARDING_DISPLAY_STEP_COUNT}`;
+  return `${step + 1} of ${ONBOARDING_DISPLAY_STEP_COUNT}`;
+}
 
 export function OnboardingFlow() {
   const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
-  const skipOnboardingWithDefaults = useAppStore((state) => state.skipOnboardingWithDefaults);
 
   const [step, setStep] = useState<OnboardingStep>(0);
+  const [scrollHeight, setScrollHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
   const [cookingFor, setCookingFor] = useState(DEFAULT_PREFERENCES.cookingFor);
   const [dietaryGoals, setDietaryGoals] = useState<string[]>([...DEFAULT_PREFERENCES.dietaryGoals]);
   const [allergies, setAllergies] = useState<string[]>([...DEFAULT_PREFERENCES.allergies]);
   const [pantryMode, setPantryMode] = useState<PantryMode>(DEFAULT_PREFERENCES.pantryMode);
+
+  const [meetArchieContinueReady, setMeetArchieContinueReady] = useState(false);
+  const meetArchieContinueOpacity = useSharedValue(1);
+
+  useEffect(() => {
+    setContentHeight(0);
+  }, [step]);
+
+  useEffect(() => {
+    if (step !== 2) {
+      setMeetArchieContinueReady(true);
+      meetArchieContinueOpacity.value = 1;
+      return;
+    }
+
+    setMeetArchieContinueReady(false);
+    meetArchieContinueOpacity.value = 0;
+
+    const continueTimer = setTimeout(() => {
+      setMeetArchieContinueReady(true);
+      meetArchieContinueOpacity.value = withTiming(1, { duration: MEET_ARCHIE_REVEAL_FADE_MS });
+    }, MEET_ARCHIE_CONTINUE_DELAY_MS);
+
+    return () => clearTimeout(continueTimer);
+  }, [meetArchieContinueOpacity, step]);
+
+  const meetArchieContinueStyle = useAnimatedStyle(() => ({
+    opacity: meetArchieContinueOpacity.value
+  }));
+
+  const contentPadding = useMemo(() => {
+    if (scrollHeight === 0 || contentHeight === 0) {
+      return spacing.lg;
+    }
+
+    if (contentHeight > scrollHeight) {
+      return spacing.lg;
+    }
+
+    return (scrollHeight - contentHeight) / 2;
+  }, [scrollHeight, contentHeight]);
+
+  const contentContainerStyle = useMemo(
+    () => [
+      styles.content,
+      {
+        minHeight: contentHeight > 0 && contentHeight <= scrollHeight ? scrollHeight : undefined,
+        paddingTop: contentPadding,
+        paddingBottom: contentPadding
+      }
+    ],
+    [contentHeight, contentPadding, scrollHeight]
+  );
 
   function toggleItem(list: string[], value: string) {
     return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
@@ -46,7 +115,7 @@ export function OnboardingFlow() {
 
   async function handleContinue() {
     await Haptics.selectionAsync();
-    if (step < 2) {
+    if (step < 3) {
       setStep((current) => (current + 1) as OnboardingStep);
       return;
     }
@@ -60,42 +129,64 @@ export function OnboardingFlow() {
     if (step > 0) setStep((current) => (current - 1) as OnboardingStep);
   }
 
-  async function handleSkip() {
-    await Haptics.selectionAsync();
-    skipOnboardingWithDefaults();
-  }
+  const isMeetArchieStep = step === 2;
+  const progressLabel = onboardingProgressLabel(step);
+  const headerTextColor = isMeetArchieStep ? colors.text : ONBOARDING_TEXT;
+  const headerMutedColor = isMeetArchieStep ? colors.text : ONBOARDING_TEXT_MUTED;
 
-  return (
-    <ImageBackground source={ONBOARDING_BG} resizeMode="cover" style={styles.root}>
-      <View style={[styles.overlay, { paddingTop: insets.top }]}>
-        <View style={styles.topBar}>
-          <View style={styles.topSide}>
-            {step > 0 ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Go back"
-                hitSlop={8}
-                onPress={handleBack}
-                style={styles.backChevronBtn}
-              >
-                <ChevronLeft color={ONBOARDING_TEXT} />
-              </Pressable>
-            ) : (
-              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.backChevronSpacer} />
-            )}
-          </View>
-          <HomemadeLogo align="center" height={36} variant="white" style={styles.brand} />
-          <View style={[styles.topSide, styles.topSideRight]}>
-            <AppText style={styles.progress}>{step + 1} of 3</AppText>
-          </View>
+  const screenBody = (
+    <View
+      style={[
+        styles.overlay,
+        isMeetArchieStep ? styles.overlayMeetArchie : null,
+        { paddingTop: insets.top }
+      ]}
+    >
+      <View style={styles.topBar}>
+        <View style={styles.topSide}>
+          {step > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              hitSlop={8}
+              onPress={handleBack}
+              style={styles.backChevronBtn}
+            >
+              <ChevronLeft color={headerTextColor} />
+            </Pressable>
+          ) : (
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.backChevronSpacer} />
+          )}
         </View>
+        {isMeetArchieStep ? (
+          <View style={styles.brand} />
+        ) : (
+          <HomemadeLogo align="center" height={36} variant="white" style={styles.brand} />
+        )}
+        <View style={[styles.topSide, styles.topSideRight]}>
+          {progressLabel ? (
+            <AppText style={[styles.progress, { color: headerMutedColor }]}>{progressLabel}</AppText>
+          ) : (
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.progressSpacer} />
+          )}
+        </View>
+      </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
+      <ScrollView
+        style={styles.scroll}
+        bounces={!isMeetArchieStep}
+        scrollEnabled={!isMeetArchieStep}
+        showsVerticalScrollIndicator={false}
+        onLayout={(event) => setScrollHeight(event.nativeEvent.layout.height)}
+        contentContainerStyle={contentContainerStyle}
+      >
+        <View
+          key={`onboarding-step-${step}`}
+          style={styles.step}
+          onLayout={(event) => setContentHeight(event.nativeEvent.layout.height)}
         >
           {step === 0 ? (
-            <View style={styles.step}>
+            <>
               <AppText variant="title" style={styles.title}>
                 Who are you cooking for?
               </AppText>
@@ -109,14 +200,11 @@ export function OnboardingFlow() {
                   />
                 ))}
               </View>
-              <Pressable accessibilityRole="button" onPress={handleSkip} style={styles.skipBtn}>
-                <AppText style={styles.skipText}>Use demo preferences</AppText>
-              </Pressable>
-            </View>
+            </>
           ) : null}
 
           {step === 1 ? (
-            <View style={styles.step}>
+            <>
               <AppText variant="title" style={styles.title}>
                 Any dietary goals?
               </AppText>
@@ -133,11 +221,13 @@ export function OnboardingFlow() {
                   />
                 ))}
               </View>
-            </View>
+            </>
           ) : null}
 
-          {step === 2 ? (
-            <View style={styles.step}>
+          {step === 2 ? <MeetArchieOnboardingStep /> : null}
+
+          {step === 3 ? (
+            <>
               <AppText variant="title" style={styles.title}>
                 What should Archie avoid?
               </AppText>
@@ -155,37 +245,54 @@ export function OnboardingFlow() {
                 ))}
               </View>
 
-              <View style={styles.section}>
-                <AppText variant="section" style={styles.sectionLabel}>
-                  How should Archie handle pantry items?
-                </AppText>
-                <View style={styles.options}>
-                  {PANTRY_MODE_OPTIONS.map((option) => (
-                    <OptionChip
-                      key={option.value}
-                      label={option.label}
-                      selected={pantryMode === option.value}
-                      onPress={() => setPantryMode(option.value)}
-                    />
-                  ))}
-                </View>
+              <AppText style={styles.subtitle}>
+                How should Archie handle pantry items?
+              </AppText>
+              <View style={styles.options}>
+                {PANTRY_MODE_OPTIONS.map((option) => (
+                  <OptionChip
+                    key={option.value}
+                    label={option.label}
+                    selected={pantryMode === option.value}
+                    onPress={() => setPantryMode(option.value)}
+                  />
+                ))}
               </View>
-            </View>
+            </>
           ) : null}
-        </ScrollView>
+        </View>
+      </ScrollView>
 
-        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+        <Animated.View style={[styles.primaryBtnWrap, isMeetArchieStep ? meetArchieContinueStyle : undefined]}>
           <Pressable
             accessibilityRole="button"
+            disabled={isMeetArchieStep && !meetArchieContinueReady}
             onPress={handleContinue}
-            style={[styles.primaryBtn, { backgroundColor: colors.brand }]}
+            style={[
+              styles.primaryBtn,
+              { backgroundColor: isMeetArchieStep ? colors.text : colors.brand }
+            ]}
           >
-            <AppText style={[styles.primaryLabel, { color: colors.brandOnBrand }]}>
-              {step === 2 ? "Start cooking" : "Continue"}
+            <AppText
+              style={[
+                styles.primaryLabel,
+                { color: isMeetArchieStep ? "#FFFFFF" : colors.brandOnBrand }
+              ]}
+            >
+              {step === 3 ? "Start cooking" : "Continue"}
             </AppText>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
+    </View>
+  );
+
+  return isMeetArchieStep ? (
+    <ArchieGradientBackground style={styles.root}>{screenBody}</ArchieGradientBackground>
+  ) : (
+    <ImageBackground source={ONBOARDING_BG} resizeMode="cover" style={styles.root}>
+      {screenBody}
     </ImageBackground>
   );
 }
@@ -255,6 +362,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.42)",
     flex: 1
   },
+  overlayMeetArchie: {
+    backgroundColor: "transparent"
+  },
   topBar: {
     alignItems: "center",
     flexDirection: "row",
@@ -288,17 +398,22 @@ const styles = StyleSheet.create({
     width: 40
   },
   progress: {
-    color: ONBOARDING_TEXT_MUTED,
     fontFamily,
     fontSize: 13,
     fontWeight: "500",
     textAlign: "right",
     width: "100%"
   },
+  progressSpacer: {
+    height: 13,
+    width: "100%"
+  },
+  scroll: {
+    flex: 1
+  },
   content: {
     flexGrow: 1,
-    paddingHorizontal: layout.screenPadding,
-    paddingTop: spacing.lg
+    paddingHorizontal: layout.screenPadding
   },
   step: {
     gap: spacing.lg
@@ -311,13 +426,6 @@ const styles = StyleSheet.create({
     fontFamily,
     fontSize: 15,
     lineHeight: 22
-  },
-  section: {
-    gap: spacing.md,
-    marginTop: spacing.md
-  },
-  sectionLabel: {
-    color: ONBOARDING_TEXT_MUTED
   },
   options: {
     flexDirection: "row",
@@ -337,27 +445,21 @@ const styles = StyleSheet.create({
     borderColor: ONBOARDING_CHIP_BORDER
   },
   chipFrostTint: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: ONBOARDING_CHIP_FROST_TINT
   },
   chipText: {
     fontFamily,
     fontSize: 14
   },
-  skipBtn: {
-    alignSelf: "flex-start",
-    paddingVertical: spacing.sm
-  },
-  skipText: {
-    color: ONBOARDING_TEXT_MUTED,
-    fontFamily,
-    fontSize: 14,
-    textDecorationLine: "underline"
-  },
   footer: {
     alignItems: "center",
     paddingHorizontal: layout.screenPadding,
     paddingTop: spacing.md
+  },
+  primaryBtnWrap: {
+    alignSelf: "stretch",
+    width: "100%"
   },
   primaryBtn: {
     alignItems: "center",

@@ -50,7 +50,7 @@ export function BrandHeader() {
         styles.header,
         {
           paddingTop: insets.top + layout.headerPaddingTop,
-          backgroundColor: isArchie ? colors.brandSoft : colors.background
+          backgroundColor: isArchie ? "transparent" : colors.background
         }
       ]}
     >
@@ -61,17 +61,19 @@ export function BrandHeader() {
             accessibilityLabel="Leave Archie"
             hitSlop={8}
             onPress={handleBack}
-            style={styles.backButton}
+            style={styles.sideButton}
           >
             <ChevronLeft color={colors.text} />
           </Pressable>
-          <ArchieLogo align="center" height={36} style={styles.logo} />
+          <View pointerEvents="none" style={styles.logoOverlay}>
+            <ArchieLogo align="center" />
+          </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Open chat list"
             hitSlop={8}
             onPress={handleOpenChats}
-            style={styles.backButton}
+            style={styles.sideButton}
           >
             <ChatHistoryIcon color={colors.text} />
           </Pressable>
@@ -86,26 +88,31 @@ export function BrandHeader() {
 const styles = StyleSheet.create({
   header: {
     alignItems: "center",
+    overflow: "visible",
     paddingBottom: layout.headerPaddingBottom,
     paddingHorizontal: layout.screenPadding
   },
   archieBar: {
     alignItems: "center",
     flexDirection: "row",
-    minHeight: 40,
+    justifyContent: "space-between",
+    minHeight: 52,
+    overflow: "visible",
+    position: "relative",
     width: "100%"
   },
-  backButton: {
+  sideButton: {
     alignItems: "center",
     height: 40,
     justifyContent: "center",
-    width: 40
+    width: 40,
+    zIndex: 1
   },
-  backSpacer: {
-    height: 40,
-    width: 40
-  },
-  logo: {
-    flex: 1
+  logoOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "visible",
+    zIndex: 0
   }
 });

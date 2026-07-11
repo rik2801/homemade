@@ -1,12 +1,12 @@
-import { Image, StyleSheet, View, type ViewStyle } from "react-native";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { StyleSheet, Text, View, type ViewStyle } from "react-native";
+import {
+  archieBrandColor,
+  archieEmphasisStyle,
+  archieFontFamily,
+  archieTextScale
+} from "@/theme/typography";
 
-const LOGO_ASPECT = 1672 / 941;
-
-const logos = {
-  light: require("@/assets/images/archie-green.png"),
-  dark: require("@/assets/images/archir-yellow.png")
-} as const;
+const LOGO_BOX_HEIGHT = 44;
 
 type ArchieLogoProps = {
   height?: number;
@@ -14,30 +14,58 @@ type ArchieLogoProps = {
   style?: ViewStyle;
 };
 
-export function ArchieLogo({ height = 36, align = "center", style }: ArchieLogoProps) {
-  const { isDark } = useAppTheme();
-  const source = isDark ? logos.dark : logos.light;
+export function ArchieLogo({ height = LOGO_BOX_HEIGHT, align = "center", style }: ArchieLogoProps) {
+  const fontSize = Math.round(height * 0.66 * archieTextScale);
+  const lineHeight = Math.round(fontSize * 1.34);
 
   return (
-    <View style={[styles.wrap, align === "center" ? styles.center : styles.left, style]}>
-      <Image
+    <View
+      style={[
+        styles.wrap,
+        align === "center" ? styles.center : styles.left,
+        { minHeight: height + 8 },
+        style
+      ]}
+    >
+      <Text
         accessibilityLabel="Archie"
-        resizeMode="contain"
-        source={source}
-        style={{ width: height * LOGO_ASPECT, height }}
-      />
+        style={[
+          styles.logo,
+          {
+            color: archieBrandColor,
+            fontFamily: archieFontFamily,
+            fontSize,
+            lineHeight,
+            ...archieEmphasisStyle(archieBrandColor)
+          }
+        ]}
+      >
+        Archie
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    justifyContent: "center"
+    alignSelf: "center",
+    justifyContent: "center",
+    overflow: "visible",
+    paddingHorizontal: 8,
+    paddingVertical: 2
   },
   left: {
     alignItems: "flex-start"
   },
   center: {
     alignItems: "center"
+  },
+  logo: {
+    flexShrink: 0,
+    includeFontPadding: false,
+    paddingBottom: 3,
+    paddingHorizontal: 4,
+    paddingTop: 7,
+    textAlign: "center"
   }
 });

@@ -7,6 +7,7 @@ import { ToastBanner } from "@/components/layout/ToastBanner";
 import { ArchieChatSidebar } from "@/components/archie/ArchieChatSidebar";
 import { ArchieComposer, archieComposerBottomOffset } from "@/components/archie/ArchieComposer";
 import { ComposerAttachmentSheets } from "@/components/archie/ComposerAttachmentSheets";
+import { ArchieGradientBackground } from "@/components/onboarding/ArchieGradientBackground";
 import { ArchitecturePrivacySheet } from "@/components/more/ArchitecturePrivacySheet";
 import { PreferenceEditSheet } from "@/components/profile/PreferenceEditSheet";
 import { SwapIngredientSheet } from "@/components/swap/SwapIngredientSheet";
@@ -34,28 +35,27 @@ export default function AppShell() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <BrandHeader />
-      <View style={styles.body}>
-        {activeTab === "home" ? <HomeScreen /> : null}
-        {activeTab === "recipes" ? <RecipesScreen /> : null}
-        {activeTab === "archie" ? (
-          <View style={[styles.archieBody, { backgroundColor: colors.brandSoft }]}>
-            <View style={styles.archieContent}>
-              <ArchieScreen />
-            </View>
-            <View
-              style={[
-                styles.archieComposerFooter,
-                { backgroundColor: colors.brandSoft, paddingBottom: archieComposerBottom }
-              ]}
-            >
-              <ArchieComposer />
-            </View>
+    <View style={[styles.root, activeTab === "archie" ? styles.rootArchie : { backgroundColor: colors.background }]}>
+      {activeTab === "archie" ? (
+        <ArchieGradientBackground style={styles.archieShell}>
+          <BrandHeader />
+          <View style={styles.archieContent}>
+            <ArchieScreen />
           </View>
-        ) : null}
-        {activeTab === "profile" ? <ProfileScreen /> : null}
-      </View>
+          <View style={[styles.archieComposerFooter, { paddingBottom: archieComposerBottom }]}>
+            <ArchieComposer />
+          </View>
+        </ArchieGradientBackground>
+      ) : (
+        <>
+          <BrandHeader />
+          <View style={styles.body}>
+            {activeTab === "home" ? <HomeScreen /> : null}
+            {activeTab === "recipes" ? <RecipesScreen /> : null}
+            {activeTab === "profile" ? <ProfileScreen /> : null}
+          </View>
+        </>
+      )}
       <BottomTabBar />
       <ToastBanner />
       <ArchieChatSidebar />
@@ -71,10 +71,13 @@ const styles = StyleSheet.create({
   root: {
     flex: 1
   },
+  rootArchie: {
+    backgroundColor: "transparent"
+  },
   body: {
     flex: 1
   },
-  archieBody: {
+  archieShell: {
     flex: 1,
     minHeight: 0
   },

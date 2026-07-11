@@ -28,6 +28,7 @@ type MascotMetrics = {
   eyeGap: number;
   eyesTop: number;
   eyeLookX: number;
+  eyeLookY: number;
   eyeLookDown: number;
 };
 
@@ -40,7 +41,8 @@ function getMascotMetrics(size: number): MascotMetrics {
     eyeHeight,
     eyeGap: eyeWidth * 0.22,
     eyesTop: size * 0.51 - eyeHeight / 2,
-    eyeLookX: size * 0.014,
+    eyeLookX: size * 0.024,
+    eyeLookY: size * 0.02,
     eyeLookDown: size * 0.038
   };
 }
@@ -81,13 +83,38 @@ function BlinkingEye({
   );
 }
 
-function startIdleLookLoop(lookX: SharedValue<number>, eyeLookX: number) {
+function startIdleLookLoop(
+  lookX: SharedValue<number>,
+  lookY: SharedValue<number>,
+  eyeLookX: number,
+  eyeLookY: number
+) {
+  const ease = Easing.inOut(Easing.quad);
+
   cancelAnimation(lookX);
+  cancelAnimation(lookY);
+
   lookX.value = withRepeat(
     withSequence(
-      withDelay(2200, withTiming(-eyeLookX, { duration: 420, easing: Easing.inOut(Easing.quad) })),
-      withDelay(1400, withTiming(eyeLookX, { duration: 480, easing: Easing.inOut(Easing.quad) })),
-      withDelay(1400, withTiming(0, { duration: 420, easing: Easing.inOut(Easing.quad) }))
+      withDelay(2200, withTiming(-eyeLookX, { duration: 420, easing: ease })),
+      withDelay(1400, withTiming(eyeLookX, { duration: 480, easing: ease })),
+      withDelay(1400, withTiming(0, { duration: 420, easing: ease })),
+      withDelay(1600, withTiming(-eyeLookX, { duration: 420, easing: ease })),
+      withDelay(1400, withTiming(eyeLookX, { duration: 480, easing: ease })),
+      withDelay(1400, withTiming(0, { duration: 420, easing: ease }))
+    ),
+    -1,
+    false
+  );
+
+  lookY.value = withRepeat(
+    withSequence(
+      withDelay(2200, withTiming(0, { duration: 420, easing: ease })),
+      withDelay(1400, withTiming(0, { duration: 480, easing: ease })),
+      withDelay(1400, withTiming(0, { duration: 420, easing: ease })),
+      withDelay(1600, withTiming(-eyeLookY, { duration: 420, easing: ease })),
+      withDelay(1400, withTiming(-eyeLookY, { duration: 480, easing: ease })),
+      withDelay(1400, withTiming(0, { duration: 420, easing: ease }))
     ),
     -1,
     false
@@ -132,8 +159,8 @@ export function ArchieMascotAvatar({ size = MASCOT_SIZE }: ArchieMascotAvatarPro
     }
 
     lookY.value = withTiming(0, { duration: 280, easing: Easing.inOut(Easing.quad) });
-    startIdleLookLoop(lookX, metrics.eyeLookX);
-  }, [isLookingDown, lookX, lookY, metrics.eyeLookDown, metrics.eyeLookX]);
+    startIdleLookLoop(lookX, lookY, metrics.eyeLookX, metrics.eyeLookY);
+  }, [isLookingDown, lookX, lookY, metrics.eyeLookDown, metrics.eyeLookX, metrics.eyeLookY]);
 
   const eyesRowStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: lookX.value }, { translateY: lookY.value }]

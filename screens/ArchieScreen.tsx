@@ -1,5 +1,4 @@
-import * as Haptics from "expo-haptics";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Image, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -42,8 +41,6 @@ export function ArchieScreen() {
   const pantryMode = useAppStore((state) => state.pantryMode);
   const lastApplied = useAppStore((state) => state.lastApplied);
   const applyPhase = useAppStore((state) => state.applyPhase);
-  const startSwapIntent = useAppStore((state) => state.startSwapIntent);
-  const submitAssistantInput = useAppStore((state) => state.submitAssistantInput);
   const setProgressStep = useAppStore((state) => state.setProgressStep);
   const setPendingSuggestion = useAppStore((state) => state.setPendingSuggestion);
   const setAssistantPhase = useAppStore((state) => state.setAssistantPhase);
@@ -152,41 +149,6 @@ export function ArchieScreen() {
     setProgressStep
   ]);
 
-  const runQuickAction = useCallback(
-    async (action: () => void) => {
-      await Haptics.selectionAsync();
-      action();
-    },
-    []
-  );
-
-  const quickActions = useMemo(
-    () => [
-      {
-        id: "swap",
-        label: "Swap an ingredient",
-        onPress: () => runQuickAction(() => startSwapIntent())
-      },
-      {
-        id: "sodium",
-        label: "Lower sodium",
-        onPress: () => runQuickAction(() => submitAssistantInput("Make this soup lower sodium"))
-      },
-      {
-        id: "dairy-free",
-        label: "Dairy-free options",
-        onPress: () =>
-          runQuickAction(() => submitAssistantInput("What dairy-free options work for this recipe?"))
-      },
-      {
-        id: "pantry",
-        label: "Use what I have",
-        onPress: () => runQuickAction(() => submitAssistantInput("Use what I have in my pantry"))
-      }
-    ],
-    [runQuickAction, startSwapIntent, submitAssistantInput]
-  );
-
   const emptyStyle = useAnimatedStyle(() => ({
     opacity: emptyOpacity.value
   }));
@@ -201,7 +163,7 @@ export function ArchieScreen() {
   );
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.brandSoft }]}>
+    <View style={styles.screen}>
       <Animated.View
         pointerEvents={showWelcome ? "box-none" : "none"}
         style={[
@@ -213,10 +175,7 @@ export function ArchieScreen() {
           }
         ]}
       >
-        <ArchieEmptyState
-          headline={archieEmptyStateDefaults.headline}
-          quickActions={quickActions}
-        />
+        <ArchieEmptyState headline={archieEmptyStateDefaults.headline} />
       </Animated.View>
 
       <Animated.View pointerEvents={showWelcome ? "none" : "auto"} style={[styles.conversationLayer, conversationStyle]}>

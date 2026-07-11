@@ -1,24 +1,16 @@
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { AppText } from "@/components/primitives/AppText";
 import { ArchieMascotAvatar } from "@/components/archie/ArchieMascotAvatar";
-import { useAppTheme } from "@/hooks/useAppTheme";
 import { fontFamily } from "@/theme/typography";
-import { radius, spacing } from "@/theme/spacing";
+import { spacing } from "@/theme/spacing";
 
 export { ARCHIE_MASCOT_IMAGE } from "@/components/archie/ArchieMascotAvatar";
-
-export type ArchieQuickAction = {
-  id: string;
-  label: string;
-  onPress: () => void | Promise<void>;
-};
 
 export type ArchieEmptyStateProps = {
   headline: string;
   subtext?: string;
   avatar?: ReactNode;
-  quickActions: ArchieQuickAction[];
 };
 
 export function ArchieAvatarPlaceholder() {
@@ -29,29 +21,7 @@ export function ArchieAvatarPlaceholder() {
   );
 }
 
-function QuickActionTile({ action }: { action: ArchieQuickAction }) {
-  const { colors } = useAppTheme();
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={action.label}
-      onPress={action.onPress}
-      style={({ pressed }) => [
-        styles.actionTile,
-        {
-          backgroundColor: pressed ? colors.brandSoft : colors.surface,
-          borderColor: pressed ? colors.brandBorder : colors.borderLight,
-          shadowColor: colors.shadow
-        }
-      ]}
-    >
-      <AppText style={styles.actionLabel}>{action.label}</AppText>
-    </Pressable>
-  );
-}
-
-export function ArchieEmptyState({ headline, subtext, avatar, quickActions }: ArchieEmptyStateProps) {
+export function ArchieEmptyState({ headline, subtext, avatar }: ArchieEmptyStateProps) {
   return (
     <View style={styles.root}>
       {avatar ?? <ArchieAvatarPlaceholder />}
@@ -62,11 +32,6 @@ export function ArchieEmptyState({ headline, subtext, avatar, quickActions }: Ar
             {subtext}
           </AppText>
         ) : null}
-        <View style={styles.actionGrid}>
-          {quickActions.map((action) => (
-            <QuickActionTile key={action.id} action={action} />
-          ))}
-        </View>
       </View>
     </View>
   );
@@ -100,35 +65,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     lineHeight: 13,
     maxWidth: 280,
-    textAlign: "center"
-  },
-  actionGrid: {
-    columnGap: spacing.sm,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: spacing.xs,
-    rowGap: spacing.sm,
-    width: "100%"
-  },
-  actionTile: {
-    alignItems: "center",
-    borderRadius: radius.md,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    width: "47.5%"
-  },
-  actionLabel: {
-    fontFamily,
-    fontSize: 8,
-    fontWeight: "400",
-    letterSpacing: -0.1,
-    lineHeight: 11,
     textAlign: "center"
   }
 });
