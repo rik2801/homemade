@@ -1,6 +1,7 @@
+import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ImageBackground, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { AppText } from "@/components/primitives/AppText";
@@ -18,6 +19,12 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
 import { fontFamily } from "@/theme/typography";
 import { layout, radius, spacing } from "@/theme/spacing";
+
+const ONBOARDING_BG = require("@/assets/images/onboarding-bg.png");
+const ONBOARDING_TEXT = "#FFFFFF";
+const ONBOARDING_TEXT_MUTED = "rgba(255, 255, 255, 0.78)";
+const ONBOARDING_CHIP_BORDER = "rgba(255, 255, 255, 0.38)";
+const ONBOARDING_CHIP_FROST_TINT = "rgba(255, 255, 255, 0.18)";
 
 type OnboardingStep = 0 | 1 | 2;
 
@@ -59,117 +66,127 @@ export function OnboardingFlow() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-      <View style={styles.topBar}>
-        <View style={styles.topSide}>
-          {step > 0 ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              hitSlop={8}
-              onPress={handleBack}
-              style={styles.backChevronBtn}
-            >
-              <ChevronLeft color={colors.text} />
-            </Pressable>
-          ) : (
-            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.backChevronSpacer} />
-          )}
-        </View>
-        <HomemadeLogo align="center" height={36} style={styles.brand} />
-        <View style={[styles.topSide, styles.topSideRight]}>
-          <AppText style={[styles.progress, { color: colors.faint }]}>{step + 1} of 3</AppText>
-        </View>
-      </View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
-      >
-        {step === 0 ? (
-          <View style={styles.step}>
-            <AppText variant="title">Who are you cooking for?</AppText>
-            <View style={styles.options}>
-              {COOKING_FOR_OPTIONS.map((option) => (
-                <OptionChip
-                  key={option}
-                  label={option}
-                  selected={cookingFor === option}
-                  onPress={() => setCookingFor(option)}
-                />
-              ))}
-            </View>
-            <Pressable accessibilityRole="button" onPress={handleSkip} style={styles.skipBtn}>
-              <AppText style={[styles.skipText, { color: colors.muted }]}>Use demo preferences</AppText>
-            </Pressable>
+    <ImageBackground source={ONBOARDING_BG} resizeMode="cover" style={styles.root}>
+      <View style={[styles.overlay, { paddingTop: insets.top }]}>
+        <View style={styles.topBar}>
+          <View style={styles.topSide}>
+            {step > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
+                hitSlop={8}
+                onPress={handleBack}
+                style={styles.backChevronBtn}
+              >
+                <ChevronLeft color={ONBOARDING_TEXT} />
+              </Pressable>
+            ) : (
+              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.backChevronSpacer} />
+            )}
           </View>
-        ) : null}
-
-        {step === 1 ? (
-          <View style={styles.step}>
-            <AppText variant="title">Any dietary goals?</AppText>
-            <AppText muted style={styles.subtitle}>
-              Select all that apply. Archie uses these when suggesting swaps.
-            </AppText>
-            <View style={styles.options}>
-              {DIETARY_GOAL_OPTIONS.map((option) => (
-                <OptionChip
-                  key={option}
-                  label={option}
-                  selected={dietaryGoals.includes(option)}
-                  onPress={() => setDietaryGoals((current) => toggleItem(current, option))}
-                />
-              ))}
-            </View>
+          <HomemadeLogo align="center" height={36} variant="white" style={styles.brand} />
+          <View style={[styles.topSide, styles.topSideRight]}>
+            <AppText style={styles.progress}>{step + 1} of 3</AppText>
           </View>
-        ) : null}
+        </View>
 
-        {step === 2 ? (
-          <View style={styles.step}>
-            <AppText variant="title">What should Archie avoid?</AppText>
-            <AppText muted style={styles.subtitle}>
-              Select allergens or ingredients to avoid in recommendations.
-            </AppText>
-            <View style={styles.options}>
-              {ALLERGY_OPTIONS.map((option) => (
-                <OptionChip
-                  key={option}
-                  label={option}
-                  selected={allergies.includes(option)}
-                  onPress={() => setAllergies((current) => toggleItem(current, option))}
-                />
-              ))}
-            </View>
-
-            <View style={styles.section}>
-              <AppText variant="section">How should Archie handle pantry items?</AppText>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
+        >
+          {step === 0 ? (
+            <View style={styles.step}>
+              <AppText variant="title" style={styles.title}>
+                Who are you cooking for?
+              </AppText>
               <View style={styles.options}>
-                {PANTRY_MODE_OPTIONS.map((option) => (
+                {COOKING_FOR_OPTIONS.map((option) => (
                   <OptionChip
-                    key={option.value}
-                    label={option.label}
-                    selected={pantryMode === option.value}
-                    onPress={() => setPantryMode(option.value)}
+                    key={option}
+                    label={option}
+                    selected={cookingFor === option}
+                    onPress={() => setCookingFor(option)}
+                  />
+                ))}
+              </View>
+              <Pressable accessibilityRole="button" onPress={handleSkip} style={styles.skipBtn}>
+                <AppText style={styles.skipText}>Use demo preferences</AppText>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {step === 1 ? (
+            <View style={styles.step}>
+              <AppText variant="title" style={styles.title}>
+                Any dietary goals?
+              </AppText>
+              <AppText style={styles.subtitle}>
+                Select all that apply. Archie uses these when suggesting swaps.
+              </AppText>
+              <View style={styles.options}>
+                {DIETARY_GOAL_OPTIONS.map((option) => (
+                  <OptionChip
+                    key={option}
+                    label={option}
+                    selected={dietaryGoals.includes(option)}
+                    onPress={() => setDietaryGoals((current) => toggleItem(current, option))}
                   />
                 ))}
               </View>
             </View>
-          </View>
-        ) : null}
-      </ScrollView>
+          ) : null}
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md, borderTopColor: colors.borderLight }]}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={handleContinue}
-          style={[styles.primaryBtn, { backgroundColor: colors.brand }]}
-        >
-          <AppText style={[styles.primaryLabel, { color: colors.brandOnBrand }]}>
-            {step === 2 ? "Start cooking" : "Continue"}
-          </AppText>
-        </Pressable>
+          {step === 2 ? (
+            <View style={styles.step}>
+              <AppText variant="title" style={styles.title}>
+                What should Archie avoid?
+              </AppText>
+              <AppText style={styles.subtitle}>
+                Select allergens or ingredients to avoid in recommendations.
+              </AppText>
+              <View style={styles.options}>
+                {ALLERGY_OPTIONS.map((option) => (
+                  <OptionChip
+                    key={option}
+                    label={option}
+                    selected={allergies.includes(option)}
+                    onPress={() => setAllergies((current) => toggleItem(current, option))}
+                  />
+                ))}
+              </View>
+
+              <View style={styles.section}>
+                <AppText variant="section" style={styles.sectionLabel}>
+                  How should Archie handle pantry items?
+                </AppText>
+                <View style={styles.options}>
+                  {PANTRY_MODE_OPTIONS.map((option) => (
+                    <OptionChip
+                      key={option.value}
+                      label={option.label}
+                      selected={pantryMode === option.value}
+                      onPress={() => setPantryMode(option.value)}
+                    />
+                  ))}
+                </View>
+              </View>
+            </View>
+          ) : null}
+        </ScrollView>
+
+        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleContinue}
+            style={[styles.primaryBtn, { backgroundColor: colors.brand }]}
+          >
+            <AppText style={[styles.primaryLabel, { color: colors.brandOnBrand }]}>
+              {step === 2 ? "Start cooking" : "Continue"}
+            </AppText>
+          </Pressable>
+        </View>
       </View>
-    </View>
+    </ImageBackground>
   );
 }
 
@@ -206,13 +223,22 @@ function OptionChip({
         styles.chip,
         selected
           ? { backgroundColor: colors.brand, borderColor: colors.brand }
-          : { backgroundColor: colors.surface, borderColor: colors.border }
+          : styles.chipFrosted
       ]}
     >
+      {!selected ? (
+        <>
+          <BlurView intensity={28} tint="light" style={StyleSheet.absoluteFill} />
+          <View pointerEvents="none" style={styles.chipFrostTint} />
+        </>
+      ) : null}
       <AppText
         style={[
           styles.chipText,
-          { color: selected ? colors.brandOnBrand : colors.text, fontWeight: selected ? "600" : "500" }
+          {
+            color: selected ? colors.brandOnBrand : ONBOARDING_TEXT,
+            fontWeight: selected ? "600" : "500"
+          }
         ]}
       >
         {label}
@@ -223,6 +249,10 @@ function OptionChip({
 
 const styles = StyleSheet.create({
   root: {
+    flex: 1
+  },
+  overlay: {
+    backgroundColor: "rgba(0, 0, 0, 0.42)",
     flex: 1
   },
   topBar: {
@@ -258,6 +288,7 @@ const styles = StyleSheet.create({
     width: 40
   },
   progress: {
+    color: ONBOARDING_TEXT_MUTED,
     fontFamily,
     fontSize: 13,
     fontWeight: "500",
@@ -272,7 +303,11 @@ const styles = StyleSheet.create({
   step: {
     gap: spacing.lg
   },
+  title: {
+    color: ONBOARDING_TEXT
+  },
   subtitle: {
+    color: ONBOARDING_TEXT_MUTED,
     fontFamily,
     fontSize: 15,
     lineHeight: 22
@@ -280,6 +315,9 @@ const styles = StyleSheet.create({
   section: {
     gap: spacing.md,
     marginTop: spacing.md
+  },
+  sectionLabel: {
+    color: ONBOARDING_TEXT_MUTED
   },
   options: {
     flexDirection: "row",
@@ -290,8 +328,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     minHeight: 44,
+    overflow: "hidden",
     paddingHorizontal: 16,
     paddingVertical: 11
+  },
+  chipFrosted: {
+    backgroundColor: "transparent",
+    borderColor: ONBOARDING_CHIP_BORDER
+  },
+  chipFrostTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: ONBOARDING_CHIP_FROST_TINT
   },
   chipText: {
     fontFamily,
@@ -302,13 +349,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm
   },
   skipText: {
+    color: ONBOARDING_TEXT_MUTED,
     fontFamily,
     fontSize: 14,
     textDecorationLine: "underline"
   },
   footer: {
     alignItems: "center",
-    borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: layout.screenPadding,
     paddingTop: spacing.md
   },
