@@ -2,7 +2,7 @@ import { StyleSheet, View } from "react-native";
 import { AppText } from "@/components/primitives/AppText";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { ArchieStructuredResponse } from "@/types/recipe";
-import { fontFamily } from "@/theme/typography";
+import { archieBrandColor, fontFamily } from "@/theme/typography";
 import { radius, spacing } from "@/theme/spacing";
 
 export type ArchieStructuredResponseCardProps = ArchieStructuredResponse;
@@ -55,8 +55,8 @@ export function ArchieStructuredResponseCard(props: ArchieStructuredResponseCard
 
   return (
     <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-      <View style={[styles.headerBar, { backgroundColor: colors.brand }]}>
-        <AppText style={[styles.headerTitle, { color: colors.brandOnBrand }]}>{props.title}</AppText>
+      <View style={[styles.headerBar, { backgroundColor: archieBrandColor }]}>
+        <AppText style={[styles.headerTitle, { color: "#FFFFFF" }]}>{props.title}</AppText>
       </View>
 
       <View style={styles.cardBody}>

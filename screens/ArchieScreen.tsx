@@ -220,7 +220,7 @@ export function ArchieScreen() {
                     styles.bubble,
                     message.role === "user" ? styles.userBubble : styles.assistBubble,
                     {
-                      backgroundColor: message.role === "user" ? colors.brand : colors.canvas
+                      backgroundColor: message.role === "user" ? colors.borderLight : colors.canvas
                     }
                   ]}
                 >
@@ -232,7 +232,7 @@ export function ArchieScreen() {
                       muted={message.role === "assistant"}
                       style={[
                         message.role === "user" ? styles.userText : styles.intro,
-                        message.role === "user" ? { color: colors.brandOnBrand } : undefined
+                        message.role === "user" ? { color: colors.text } : undefined
                       ]}
                     >
                       {message.text}

@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   headline: {
     fontFamily,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "400",
     letterSpacing: -0.3,
     lineHeight: 20,
     textAlign: "center"

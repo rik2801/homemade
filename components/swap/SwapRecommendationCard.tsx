@@ -7,7 +7,7 @@ import { iconKeyForLabel } from "@/lib/swapFlow";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
 import type { PendingSuggestion } from "@/types/recipe";
-import { fontFamily } from "@/theme/typography";
+import { archieBrandColor, fontFamily } from "@/theme/typography";
 import { radius, spacing } from "@/theme/spacing";
 
 type SwapRecommendationCardProps = {
@@ -56,8 +56,8 @@ export function SwapRecommendationCard({ suggestion }: SwapRecommendationCardPro
 
   return (
     <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-      <View style={[styles.headerBar, { backgroundColor: colors.brand }]}>
-        <AppText style={[styles.headerTitle, { color: colors.brandOnBrand }]}>Archie&apos;s recommendation</AppText>
+      <View style={[styles.headerBar, { backgroundColor: archieBrandColor }]}>
+        <AppText style={[styles.headerTitle, { color: "#FFFFFF" }]}>Archie&apos;s recommendation</AppText>
       </View>
 
       <View style={styles.cardBody}>
