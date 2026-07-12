@@ -5,12 +5,6 @@ type AnswerContext = {
   recipeTitle?: string;
 };
 
-const STRONG_ANSWER_PATTERN =
-  /^(Yes\.|Yes,|No\.|No,|Yes, but|Probably|Not recommended|It depends)/i;
-
-const WEAK_OPENERS =
-  /^(This way|However|Considering|You may|It depends on|Cottage cheese can|Based on|I identified|I see|Your photo|This looks|Try |I think)/i;
-
 export function splitSentences(text: string) {
   return text
     .split(/(?<=[.!?])\s+/)
@@ -29,143 +23,125 @@ export function formatSectionParagraph(text: string) {
   return chunks.join("\n\n");
 }
 
-function extractReasonSentence(reply: string) {
-  const sentences = splitSentences(reply);
-  return (
-    sentences.find((sentence) => !WEAK_OPENERS.test(sentence)) ??
-    sentences[1] ??
-    sentences[0] ??
-    reply
-  );
+/** Light cleanup only — do not change semantic meaning or force Yes/No. */
+export function cleanSummary(summary: string): string {
+  const trimmed = summary.trim().replace(/\s+/g, " ");
+  if (!trimmed) return trimmed;
+
+  const sentences = splitSentences(trimmed);
+  const deduped: string[] = [];
+  for (const sentence of sentences) {
+    const prev = deduped[deduped.length - 1];
+    if (prev && prev.toLowerCase() === sentence.toLowerCase()) continue;
+    deduped.push(sentence);
+  }
+
+  return deduped.join(" ").replace(/([.!?]){2,}/g, "$1");
 }
 
-function stripLeadingOpener(sentence: string) {
-  return sentence
-    .replace(/^(yes|no|maybe|probably),?\s*/i, "")
-    .replace(/^(however|considering|this way),?\s*/i, "")
+function normalizeForOverlap(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
-function buildDirectAnswerFromQuestion(userMessage: string, reply: string): string | null {
-  const question = userMessage.trim();
-  const lowerReply = reply.toLowerCase();
+/** Deterministic overlap check — omit sections that restate the summary. */
+export function isSemanticallyDuplicate(sectionText: string, summary: string): boolean {
+  const a = normalizeForOverlap(sectionText);
+  const b = normalizeForOverlap(summary);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.includes(b) || b.includes(a)) return true;
 
-  if (/cottage\s*cheese/i.test(question) && /\b(condition|dietary|go well|good for me|good for)\b/i.test(question)) {
-    return "Yes. Cottage cheese can be a good choice for your low-fat and low-sodium goals, especially if you choose a low-fat, lower-sodium variety.";
+  const tokensA = a.split(" ").filter((token) => token.length > 3);
+  const tokensB = new Set(b.split(" ").filter((token) => token.length > 3));
+  if (tokensA.length === 0) return false;
+
+  let overlap = 0;
+  for (const token of tokensA) {
+    if (tokensB.has(token)) overlap += 1;
   }
 
-  if (
-    /\b(instead of|replace|substitut)\b/i.test(question) &&
-    /\bheavy\s*cream\b/i.test(question)
-  ) {
-    if (/cottage/i.test(question) || /cottage/i.test(lowerReply)) {
-      return "Yes. Cottage cheese works well as a substitute for heavy cream if you blend it before adding it to the soup.";
-    }
-  }
-
-  if (
-    /\b(can i use|can we add|will .+ go well|can .+ replace|should i use|use this)\b/i.test(question) &&
-    /cottage/i.test(question + lowerReply)
-  ) {
-    if (/\bheavy\s*cream\b/i.test(question + lowerReply) || /\bsoup\b/i.test(question + lowerReply)) {
-      return "Yes. Cottage cheese works well as a substitute for heavy cream if you blend it before adding it to the soup.";
-    }
-  }
-
-  if (/\bmushroom/i.test(question) && /\b(add|use|can i)\b/i.test(question)) {
-    return "Yes. Mushrooms pair well with tomato soup and add extra flavor without changing the texture.";
-  }
-
-  if (/\bbutter\b/i.test(question) && /\b(use|add|can i)\b/i.test(question)) {
-    if (/low[\s-]?fat|lower in fat/i.test(question + lowerReply)) {
-      return "Yes, but only in small amounts if you're trying to keep the recipe lower in fat.";
-    }
-    return "Yes, but use butter sparingly if you're keeping the dish lower in fat.";
-  }
-
-  if (/\b(is .+ good|good for me|good for my)\b/i.test(question) && /cottage/i.test(question + lowerReply)) {
-    return "Yes. Cottage cheese can be a good option if you're aiming for a lower-fat, higher-protein diet — choose a low-fat variety and watch the sodium.";
-  }
-
-  return null;
+  return overlap / tokensA.length >= 0.6;
 }
 
-function inferPolarity(reply: string) {
-  const lower = reply.toLowerCase();
-  if (/\b(not recommended|shouldn't|should not|avoid|isn't a good|no,)\b/i.test(lower)) return "no";
-  if (/\b(maybe|depends|caution|it depends)\b/i.test(lower)) return "depends";
-  if (/\b(yes|can work|works well|good choice|good option|can be a good|recommended)\b/i.test(lower)) {
-    return "yes";
-  }
-  return "yes";
-}
+export type StructuredSection = {
+  key: string;
+  label: string;
+  value: string;
+};
 
-export function buildDirectAnswer(
+/** Drop sections that mostly repeat the summary or each other. */
+export function removeOverlappingSections(
   summary: string,
-  reply: string,
-  context: AnswerContext
-): string {
-  const trimmedSummary = summary.trim();
-
-  if (/^I think you may mean/i.test(trimmedSummary)) {
-    return splitSentences(trimmedSummary).slice(0, 2).join(" ");
+  sections: StructuredSection[]
+): StructuredSection[] {
+  const result: StructuredSection[] = [];
+  for (const section of sections) {
+    const value = section.value.trim();
+    if (!value) continue;
+    if (isSemanticallyDuplicate(value, summary)) continue;
+    if (result.some((existing) => isSemanticallyDuplicate(value, existing.value))) continue;
+    result.push({ ...section, value });
   }
+  return result;
+}
 
-  if (context.userMessage) {
-    const fromQuestion = buildDirectAnswerFromQuestion(context.userMessage, reply);
-    if (fromQuestion) return fromQuestion;
-  }
+const UNNECESSARY_FOLLOW_UP =
+  /\s*((Would you like to know more|What's the context for using|What would you like to know|Let me know if you|Do you want me to)[^.?\n]*[.?]?\s*)+$/i;
 
-  let answer = trimmedSummary;
-  const polarity = inferPolarity(reply);
-  const reason = stripLeadingOpener(extractReasonSentence(reply));
+/** Strip padded closing questions from otherwise complete answers. */
+export function stripUnnecessaryFollowUp(reply: string): string {
+  const trimmed = reply.trim();
+  if (!trimmed) return trimmed;
 
-  if (WEAK_OPENERS.test(answer) || !STRONG_ANSWER_PATTERN.test(answer)) {
-    if (polarity === "no") {
-      answer = `No. ${reason}`;
-    } else if (polarity === "depends") {
-      answer = `It depends. ${reason}`;
-    } else if (/yes, but|only in small|sparingly/i.test(reply)) {
-      answer = `Yes, but ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`;
-    } else {
-      answer = `Yes. ${reason}`;
+  const withoutFollowUp = trimmed.replace(UNNECESSARY_FOLLOW_UP, "").trim();
+  // Also drop a trailing question sentence when prior content already answers.
+  const sentences = splitSentences(withoutFollowUp);
+  if (sentences.length >= 2 && /\?\s*$/.test(sentences[sentences.length - 1])) {
+    const last = sentences[sentences.length - 1];
+    if (
+      /^(would you|what('s| is) the context|do you want|let me know|shall i|want me to)\b/i.test(
+        last
+      )
+    ) {
+      return sentences.slice(0, -1).join(" ").trim();
     }
   }
 
-  if (!STRONG_ANSWER_PATTERN.test(answer)) {
-    if (polarity === "no") {
-      answer = `No. ${stripLeadingOpener(answer)}`;
-    } else if (polarity === "depends") {
-      answer = `It depends. ${stripLeadingOpener(answer)}`;
-    } else {
-      answer = `Yes. ${stripLeadingOpener(answer)}`;
-    }
-  }
-
-  return splitSentences(answer).slice(0, 2).join(" ");
+  return withoutFollowUp;
 }
 
 export function finalizeStructuredResponse(
   response: ArchieStructuredResponse,
-  context: AnswerContext,
-  reply?: string
+  _context: AnswerContext,
+  _reply?: string
 ): ArchieStructuredResponse {
-  const sourceReply = reply ?? response.summary;
   const isNote = response.title === "Archie's note";
 
   const summary = isNote
     ? formatSectionParagraph(response.summary)
-    : buildDirectAnswer(response.summary, sourceReply, context);
+    : cleanSummary(response.summary);
+
+  const maybeSection = (value: string | undefined) => {
+    if (!value) return undefined;
+    const formatted = formatSectionParagraph(value);
+    if (isSemanticallyDuplicate(formatted, summary)) return undefined;
+    return formatted;
+  };
 
   return {
     ...response,
     summary,
-    howToUse: response.howToUse ? formatSectionParagraph(response.howToUse) : undefined,
-    dietaryFit: response.dietaryFit ? formatSectionParagraph(response.dietaryFit) : undefined,
-    watchOut: response.watchOut ? formatSectionParagraph(response.watchOut) : undefined,
-    recipeUpdate: response.recipeUpdate ? formatSectionParagraph(response.recipeUpdate) : undefined,
-    whyThisWorks: response.whyThisWorks ? formatSectionParagraph(response.whyThisWorks) : undefined,
-    nutritionNote: response.nutritionNote ? formatSectionParagraph(response.nutritionNote) : undefined,
-    nextStep: response.nextStep ? formatSectionParagraph(response.nextStep) : undefined
+    howToUse: maybeSection(response.howToUse),
+    dietaryFit: maybeSection(response.dietaryFit),
+    preferenceFit: maybeSection(response.preferenceFit),
+    watchOut: maybeSection(response.watchOut),
+    recipeUpdate: maybeSection(response.recipeUpdate),
+    whyThisWorks: maybeSection(response.whyThisWorks),
+    nutritionNote: maybeSection(response.nutritionNote),
+    nextStep: maybeSection(response.nextStep)
   };
 }

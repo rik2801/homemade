@@ -2,7 +2,7 @@ export type UserProfileContext = {
   cookingFor: string;
   dietaryGoals: string[];
   allergies: string[];
-  recipeTitle: string;
+  recipeTitle?: string;
 };
 
 export type ChatHistoryTurn = {
@@ -93,6 +93,9 @@ export function buildScopedDeclineReply(profile: UserProfileContext): string {
     profile.allergies.length > 0
       ? ` I'll keep ${profile.allergies.join(", ").toLowerCase()} in mind for anything we discuss.`
       : "";
+  const recipeHint = profile.recipeTitle
+    ? ` ask me about ${profile.recipeTitle} or what you're cooking`
+    : ` attach a recipe or ask about what you're cooking`;
 
-  return `I'm Archie — I can only help with recipes and nutrition, like ingredient swaps, ${goals}, and meals for ${profile.cookingFor.toLowerCase()}.${allergyNote} I can't help with that request, but ask me about ${profile.recipeTitle} or what you're cooking and I'll gladly assist.`;
+  return `I'm Archie — I can only help with recipes and nutrition, like ingredient swaps, ${goals}, and meals for ${profile.cookingFor.toLowerCase()}.${allergyNote} I can't help with that request, but${recipeHint} and I'll gladly assist.`;
 }

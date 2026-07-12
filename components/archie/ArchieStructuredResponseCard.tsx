@@ -1,57 +1,48 @@
 import { StyleSheet, View } from "react-native";
 import { AppText } from "@/components/primitives/AppText";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { isSemanticallyDuplicate, removeOverlappingSections } from "@/lib/archieAnswerFormatting";
 import type { ArchieStructuredResponse } from "@/types/recipe";
 import { archieBrandColor, fontFamily } from "@/theme/typography";
 import { radius, spacing } from "@/theme/spacing";
 
 export type ArchieStructuredResponseCardProps = ArchieStructuredResponse;
 
-type SectionDef = {
-  label: string;
-  value?: string;
-};
-
-function normalizeSectionText(text: string) {
-  return text.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function dedupeSections(sections: SectionDef[], summary: string): SectionDef[] {
-  const seen = new Set<string>([normalizeSectionText(summary)]);
-  const result: SectionDef[] = [];
-
-  for (const section of sections) {
-    const value = section.value?.trim();
-    if (!value) continue;
-
-    const normalized = normalizeSectionText(value);
-    if (seen.has(normalized)) continue;
-
-    seen.add(normalized);
-    result.push({ label: section.label, value });
-  }
-
-  return result;
-}
-
 export function ArchieStructuredResponseCard(props: ArchieStructuredResponseCardProps) {
   const { colors } = useAppTheme();
 
-  const sections = dedupeSections(
-    [
-      props.isImageResponse && props.identified
-        ? { label: "Identified", value: props.identified }
-        : { label: "Identified", value: undefined },
-      { label: "How to use", value: props.howToUse },
-      { label: "Dietary fit", value: props.dietaryFit },
-      { label: "Watch out", value: props.watchOut },
-      { label: "Recipe update", value: props.recipeUpdate },
-      { label: "Why this works", value: props.whyThisWorks },
-      { label: "Nutrition note", value: props.nutritionNote },
-      { label: "Next step", value: props.nextStep }
-    ],
-    props.summary
-  );
+  const preferenceValue = props.preferenceFit ?? props.dietaryFit;
+
+  const sections = removeOverlappingSections(props.summary, [
+    props.isImageResponse && props.identified
+      ? { key: "identified", label: "Identified", value: props.identified }
+      : { key: "identified", label: "Identified", value: "" },
+    { key: "howToUse", label: "How to use", value: props.howToUse ?? "" },
+    {
+      key: "preferenceFit",
+      label: props.preferenceFit ? "For your goals" : "Dietary fit",
+      value: preferenceValue ?? ""
+    },
+    { key: "watchOut", label: "Watch out", value: props.watchOut ?? "" },
+    { key: "recipeUpdate", label: "Recipe update", value: props.recipeUpdate ?? "" },
+    { key: "whyThisWorks", label: "Why this works", value: props.whyThisWorks ?? "" },
+    { key: "nutritionNote", label: "Nutrition note", value: props.nutritionNote ?? "" },
+    { key: "nextStep", label: "Next step", value: props.nextStep ?? "" }
+  ]).filter((section) => {
+    // Hide legacy "Dietary fit" when empty; prefer preferenceFit label when present.
+    if (section.key === "preferenceFit" && !preferenceValue) return false;
+    return Boolean(section.value.trim());
+  });
+
+  // Prefer preferenceFit over duplicate dietaryFit content.
+  const visibleSections = sections.filter((section, index, all) => {
+    if (section.key !== "preferenceFit") return true;
+    return !all.some(
+      (other) =>
+        other.key !== section.key &&
+        isSemanticallyDuplicate(other.value, section.value)
+    );
+  });
 
   return (
     <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
@@ -60,10 +51,17 @@ export function ArchieStructuredResponseCard(props: ArchieStructuredResponseCard
       </View>
 
       <View style={styles.cardBody}>
-        <AppText style={[styles.summary, { color: colors.text }]}>{props.summary}</AppText>
+        <AppText
+          style={[
+            styles.summary,
+            { color: colors.text, marginBottom: visibleSections.length === 0 ? 0 : 18 }
+          ]}
+        >
+          {props.summary}
+        </AppText>
 
-        {sections.map((section) => (
-          <ResponseSection key={section.label} label={section.label} value={section.value!} />
+        {visibleSections.map((section) => (
+          <ResponseSection key={section.key} label={section.label} value={section.value} />
         ))}
       </View>
     </View>
@@ -116,8 +114,7 @@ const styles = StyleSheet.create({
     fontFamily,
     fontSize: 16,
     fontWeight: "600",
-    lineHeight: 24,
-    marginBottom: 18
+    lineHeight: 24
   },
   section: {
     marginTop: 24

@@ -57,9 +57,14 @@ function buildCottageCheeseTomatoSoupResponse(): {
 }
 
 function buildKitchenToolResponse(request: ChatRequest, extracted: ExtractedIngredient): ChatResponse {
+  const recipeTitle = request.recipe?.title;
+  const toolHint = recipeTitle
+    ? `I can't recommend adding kitchen tools to ${recipeTitle}.`
+    : `I can't recommend adding kitchen tools to a recipe.`;
+
   return {
     source: "fallback",
-    reply: `Your photo looks like a ${extracted.name.toLowerCase()}, not an ingredient. I can't recommend adding kitchen tools to ${request.recipe.title}. Upload a photo of the food or ingredient you're considering instead.`,
+    reply: `Your photo looks like a ${extracted.name.toLowerCase()}, not an ingredient. ${toolHint} Upload a photo of the food or ingredient you're considering instead.`,
     inScope: true
   };
 }
@@ -67,14 +72,15 @@ function buildKitchenToolResponse(request: ChatRequest, extracted: ExtractedIngr
 function buildGenericCookingResponse(input: RecipeReasoningInput): ChatResponse {
   const { request, classification, extracted } = input;
   const ingredient = extracted.name;
-  const recipeTitle = request.recipe.title;
+  const recipeTitle = request.recipe?.title;
+  const recipePhrase = recipeTitle ? `For ${recipeTitle}, ` : "";
   const goals =
     request.dietaryGoals.length > 0 ? request.dietaryGoals.join(", ").toLowerCase() : "your goals";
 
   if (classification.category === "nutrition_label") {
     return {
       source: "fallback",
-      reply: `I see a nutrition label in your photo. For ${recipeTitle}, compare sodium, fat, and protein against ${goals}, then tell me which value you want help with and I can suggest adjustments.`,
+      reply: `I see a nutrition label in your photo. ${recipePhrase}compare sodium, fat, and protein against ${goals}, then tell me which value you want help with and I can suggest adjustments.`,
       inScope: true
     };
   }
@@ -82,7 +88,7 @@ function buildGenericCookingResponse(input: RecipeReasoningInput): ChatResponse 
   if (classification.category === "prepared_food") {
     return {
       source: "fallback",
-      reply: `Your photo looks like a prepared dish (${ingredient}), not a raw ingredient. For ${recipeTitle}, tell me whether you want to serve it alongside, use it as a base, or swap part of the recipe and I can guide you.`,
+      reply: `Your photo looks like a prepared dish (${ingredient}), not a raw ingredient. ${recipePhrase}tell me whether you want to serve it alongside, use it as a base, or swap part of the recipe and I can guide you.`,
       inScope: true
     };
   }
@@ -90,14 +96,14 @@ function buildGenericCookingResponse(input: RecipeReasoningInput): ChatResponse 
   if (isIngredientUsageQuestion(request.message)) {
     return {
       source: "fallback",
-      reply: `Based on your photo, this looks like ${ingredient}. For ${recipeTitle}, it may work depending on how you add it — blend smooth, stir in off heat, and avoid boiling dairy so it does not curdle. Tell me if you want a step-by-step swap for a specific ingredient.`,
+      reply: `Based on your photo, this looks like ${ingredient}. ${recipePhrase}it may work depending on how you add it — blend smooth, stir in off heat, and avoid boiling dairy so it does not curdle. Tell me if you want a step-by-step swap for a specific ingredient.`,
       inScope: true
     };
   }
 
   return {
     source: "fallback",
-    reply: `I identified ${ingredient} in your photo. For ${recipeTitle}, I can help with whether it fits ${goals}, how much to use, and how to add it without breaking the texture.`,
+    reply: `I identified ${ingredient} in your photo. ${recipePhrase}I can help with whether it fits ${goals}, how much to use, and how to add it without breaking the texture.`,
     inScope: true
   };
 }
@@ -105,7 +111,7 @@ function buildGenericCookingResponse(input: RecipeReasoningInput): ChatResponse 
 function shouldUseCottageCheeseDemo(input: RecipeReasoningInput) {
   return (
     input.extracted.name.toLowerCase().includes("cottage cheese") &&
-    input.request.recipe.id === "creamy-tomato-soup" &&
+    input.request.recipe?.id === "creamy-tomato-soup" &&
     isIngredientUsageQuestion(input.request.message)
   );
 }

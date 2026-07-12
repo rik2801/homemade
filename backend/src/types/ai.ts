@@ -76,7 +76,9 @@ export type ChatRequest = {
   imageDataUrl?: string;
   imageFilename?: string;
   history: Array<{ role: "user" | "assistant"; content: string }>;
-  recipe: SubstituteRecipeInput;
+  recipe?: SubstituteRecipeInput;
+  /** When false/missing, any recipe field is ignored. */
+  recipeExplicitlyAttached?: boolean;
   dietaryGoals: string[];
   allergies: string[];
   cookingFor: string;

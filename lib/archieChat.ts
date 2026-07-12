@@ -22,6 +22,8 @@ export function createChatMessage(
     imageUri?: string;
     recommendation?: ArchieImageRecommendation;
     structuredResponse?: ArchieStructuredResponse;
+    plainBubble?: boolean;
+    requestId?: number;
   }
 ): ArchieChatMessage {
   chatMessageCounter += 1;
@@ -31,7 +33,9 @@ export function createChatMessage(
     text,
     ...(options?.imageUri ? { imageUri: options.imageUri } : {}),
     ...(options?.recommendation ? { recommendation: options.recommendation } : {}),
-    ...(options?.structuredResponse ? { structuredResponse: options.structuredResponse } : {})
+    ...(options?.structuredResponse ? { structuredResponse: options.structuredResponse } : {}),
+    ...(options?.plainBubble ? { plainBubble: true } : {}),
+    ...(options?.requestId !== undefined ? { requestId: options.requestId } : {})
   };
 }
 
@@ -43,6 +47,8 @@ export function appendChatMessages(
     imageUri?: string;
     recommendation?: ArchieImageRecommendation;
     structuredResponse?: ArchieStructuredResponse;
+    plainBubble?: boolean;
+    requestId?: number;
   }>
 ): ArchieChatMessage[] {
   return [
@@ -51,7 +57,9 @@ export function appendChatMessages(
       createChatMessage(item.role, item.text, {
         imageUri: item.imageUri,
         recommendation: item.recommendation,
-        structuredResponse: item.structuredResponse
+        structuredResponse: item.structuredResponse,
+        plainBubble: item.plainBubble,
+        requestId: item.requestId
       })
     )
   ];

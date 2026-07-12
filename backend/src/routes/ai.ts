@@ -54,7 +54,8 @@ const chatRequestSchema = z.object({
       })
     )
     .default([]),
-  recipe: recipeSchema,
+  recipe: recipeSchema.optional(),
+  recipeExplicitlyAttached: z.boolean().optional(),
   dietaryGoals: z.array(z.string()),
   allergies: z.array(z.string()),
   cookingFor: z.string().min(1),
@@ -74,13 +75,19 @@ aiRouter.post("/chat", async (req, res) => {
   }
 
   const request = parsed.data;
+  // Ignore recipe unless the client asserts explicit attachment (prevents silent leakage).
+  const safeRequest =
+    request.recipe && request.recipeExplicitlyAttached
+      ? request
+      : { ...request, recipe: undefined, recipeExplicitlyAttached: undefined };
 
   console.info("[api] chat request", {
-    recipeId: request.recipe.id,
-    messageLength: request.message.length
+    recipeId: safeRequest.recipe?.id ?? null,
+    recipeExplicitlyAttached: Boolean(safeRequest.recipeExplicitlyAttached),
+    messageLength: safeRequest.message.length
   });
 
-  const response = await generateChatReply(request);
+  const response = await generateChatReply(safeRequest);
   return res.json(response);
 });
 

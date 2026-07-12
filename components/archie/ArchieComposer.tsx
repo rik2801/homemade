@@ -13,6 +13,7 @@ import Svg, { Path } from "react-native-svg";
 import { AppText } from "@/components/primitives/AppText";
 import { getRecipeById } from "@/features/recipe/data/homemadeRecipe";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { resolveExplicitArchieRecipeId } from "@/lib/archieChatContext";
 import { useAppStore } from "@/store/useAppStore";
 import { fontFamily } from "@/theme/typography";
 import { radius, spacing } from "@/theme/spacing";
@@ -112,16 +113,23 @@ export const ArchieComposer = memo(function ArchieComposer() {
   const { colors, isDark } = useAppTheme();
   const inputRef = useRef<TextInput>(null);
   const assistantPhase = useAppStore((state) => state.assistantPhase);
+  const chatLoading = useAppStore((state) => state.chatLoading);
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const composerFocusToken = useAppStore((state) => state.composerFocusToken);
   const composerImageUri = useAppStore((state) => state.composerImageUri);
-  const composerActiveRecipeId = useAppStore((state) => state.composerActiveRecipeId);
+  const explicitRecipeId = useAppStore((state) =>
+    resolveExplicitArchieRecipeId({
+      composerActiveRecipeId: state.composerActiveRecipeId,
+      activeSessionId: state.activeSessionId,
+      archieSessions: state.archieSessions
+    })
+  );
   const setArchieComposerDraft = useAppStore((state) => state.setArchieComposerDraft);
   const submitComposerMessage = useAppStore((state) => state.submitComposerMessage);
   const openComposerImageSheet = useAppStore((state) => state.openComposerImageSheet);
   const openComposerRecipeSheet = useAppStore((state) => state.openComposerRecipeSheet);
   const setComposerImage = useAppStore((state) => state.setComposerImage);
-  const clearComposerActiveRecipe = useAppStore((state) => state.clearComposerActiveRecipe);
+  const clearArchieRecipeContext = useAppStore((state) => state.clearArchieRecipeContext);
   type Selection = { start: number; end: number };
 
   const [text, setText] = useState("");
@@ -172,23 +180,22 @@ export const ArchieComposer = memo(function ArchieComposer() {
     inputRef.current?.focus();
   }, [composerFocusToken]);
 
-  const disabled =
+  const phaseDisabled =
     assistantPhase === "loading" ||
     assistantPhase === "pick_recipe" ||
     assistantPhase === "pick_ingredient";
-  const activeRecipeTitle = composerActiveRecipeId
-    ? getRecipeById(composerActiveRecipeId)?.title
-    : null;
-  const canSend = (text.trim().length > 0 || Boolean(composerImageUri)) && !disabled;
+  const sendDisabled = phaseDisabled || chatLoading;
+  const activeRecipeTitle = explicitRecipeId ? getRecipeById(explicitRecipeId)?.title : null;
+  const canSend = (text.trim().length > 0 || Boolean(composerImageUri)) && !sendDisabled;
   const showImagePill = !composerImageUri;
-  const showRecipePill = !composerActiveRecipeId;
+  const showRecipePill = !explicitRecipeId;
   const showAttachPills = showImagePill || showRecipePill;
   const placeholder =
     assistantPhase === "awaiting_substitute"
       ? "What do you have instead?"
       : composerImageUri
         ? "Add a note about this photo..."
-        : composerActiveRecipeId
+        : explicitRecipeId
           ? "Ask about this recipe..."
           : "What are you cooking?";
   const sendBackground = isDark ? colors.text : "#111827";
@@ -247,13 +254,13 @@ export const ArchieComposer = memo(function ArchieComposer() {
   );
 
   async function handleAddImage() {
-    if (disabled) return;
+    if (phaseDisabled) return;
     await Haptics.selectionAsync();
     openComposerImageSheet();
   }
 
   async function handleAttachRecipe() {
-    if (disabled) return;
+    if (phaseDisabled) return;
     await Haptics.selectionAsync();
     openComposerRecipeSheet();
   }
@@ -265,11 +272,11 @@ export const ArchieComposer = memo(function ArchieComposer() {
 
   async function handleClearActiveRecipe() {
     await Haptics.selectionAsync();
-    clearComposerActiveRecipe();
+    clearArchieRecipeContext();
   }
 
   async function handleChangeRecipe() {
-    if (disabled) return;
+    if (phaseDisabled) return;
     await Haptics.selectionAsync();
     openComposerRecipeSheet();
   }
@@ -282,14 +289,14 @@ export const ArchieComposer = memo(function ArchieComposer() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Add image"
-              disabled={disabled}
+              disabled={phaseDisabled}
               onPress={handleAddImage}
               style={[
                 styles.attachPill,
                 {
                   backgroundColor: colors.surface,
                   borderColor: colors.border,
-                  opacity: disabled ? 0.5 : 1
+                  opacity: phaseDisabled ? 0.5 : 1
                 }
               ]}
             >
@@ -301,14 +308,14 @@ export const ArchieComposer = memo(function ArchieComposer() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Attach recipe"
-              disabled={disabled}
+              disabled={phaseDisabled}
               onPress={handleAttachRecipe}
               style={[
                 styles.attachPill,
                 {
                   backgroundColor: colors.surface,
                   borderColor: colors.border,
-                  opacity: disabled ? 0.5 : 1
+                  opacity: phaseDisabled ? 0.5 : 1
                 }
               ]}
             >
@@ -337,7 +344,7 @@ export const ArchieComposer = memo(function ArchieComposer() {
       {activeRecipeTitle ? (
         <View style={[styles.contextChip, { backgroundColor: colors.canvas, borderColor: colors.border }]}>
           <AppText style={[styles.contextChipText, { color: colors.text }]}>
-            Cooking: {activeRecipeTitle}
+            Using: {activeRecipeTitle}
           </AppText>
           <Pressable accessibilityLabel="Change recipe" onPress={handleChangeRecipe} style={styles.contextChipAction}>
             <AppText style={[styles.contextChipActionText, { color: colors.muted }]}>Change</AppText>
@@ -360,7 +367,7 @@ export const ArchieComposer = memo(function ArchieComposer() {
         <View style={styles.composerRow}>
           <TextInput
             ref={inputRef}
-            editable={!disabled}
+            editable={!phaseDisabled && !chatLoading}
             multiline={true}
             placeholder={placeholder}
             placeholderTextColor={colors.faint}

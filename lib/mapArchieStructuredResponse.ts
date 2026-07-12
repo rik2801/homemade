@@ -1,8 +1,15 @@
 import type { ChatImageRecommendation, ChatApiResponse } from "@/services/aiClient";
 import {
   finalizeStructuredResponse,
-  splitSentences
+  isSemanticallyDuplicate,
+  removeOverlappingSections,
+  splitSentences,
+  stripUnnecessaryFollowUp
 } from "@/lib/archieAnswerFormatting";
+import {
+  isIngredientRecommendationRequest,
+  isNutritionQualityUserMessage
+} from "@/lib/inferArchieIntent";
 import type {
   ArchieImageRecommendation,
   ArchieResponseTitle,
@@ -14,6 +21,7 @@ export type MapAssistantReplyContext = {
   recipeTitle?: string;
   source?: ChatApiResponse["source"];
   hasImage?: boolean;
+  dietaryGoals?: string[];
 };
 
 const GUARDRAIL_MARKERS = [
@@ -87,6 +95,26 @@ function isConversationalPrompt(reply: string) {
   );
 }
 
+/** Clarifying questions / paraphrases should stay plain bubbles, not structured cards. */
+function isClarificationStyleReply(reply: string) {
+  const trimmed = reply.trim();
+  if (!trimmed) return false;
+  if (isConversationalPrompt(trimmed)) return true;
+  if (/^you think\b/i.test(trimmed)) return true;
+  if (/^(are you asking|what (would|are|do|ingredient)|which |can you (tell|clarify)|what are you planning)\b/i.test(trimmed)) {
+    return true;
+  }
+
+  const sentences = splitSentences(trimmed);
+  const last = sentences[sentences.length - 1] ?? "";
+  const isMostlyQuestion =
+    /\?\s*$/.test(trimmed) &&
+    sentences.length <= 2 &&
+    !/\b(blend|stir|simmer|substitute|replace|curdle)\b/i.test(trimmed);
+
+  return isMostlyQuestion && /\?/.test(last);
+}
+
 function isFoodRelatedContent(...texts: Array<string | undefined>) {
   const combined = texts.filter(Boolean).join(" ");
   if (!combined.trim()) return false;
@@ -95,7 +123,9 @@ function isFoodRelatedContent(...texts: Array<string | undefined>) {
 
 function isRecipeChangeQuestion(text?: string) {
   if (!text) return false;
-  return /\b(swap|substitut|replace|add to|use in|works in|go well|recipe|alter|change)\b/i.test(text);
+  return /\b(swap|substitut|replace|instead of|can i use|add to|use in|works in|go well|recipe|alter|change)\b/i.test(
+    text
+  );
 }
 
 function normalizeUserText(text: string) {
@@ -147,6 +177,17 @@ function buildSummary(reply: string, maxSentences = 2) {
 
 function parsePlainFoodReply(reply: string) {
   const sentences = splitSentences(reply);
+
+  // Thin replies stay summary-only — never invent section content.
+  if (sentences.length <= 1) {
+    return {
+      summary: buildSummary(reply),
+      howToUse: undefined,
+      dietaryFit: undefined,
+      watchOut: undefined,
+      recipeUpdate: undefined
+    };
+  }
 
   const howToUse = findSentence(
     sentences,
@@ -243,29 +284,40 @@ function buildExtractionFailureCard(): ArchieStructuredResponse {
   };
 }
 
-function buildCottageCheeseTextCard(reply: string, context: MapAssistantReplyContext): ArchieStructuredResponse {
-  const parsed = parsePlainFoodReply(reply);
-  const recipeTitle = context.recipeTitle ?? "creamy tomato soup";
-  const isRecipeQuestion = isRecipeChangeQuestion(context.userMessage);
+function buildPersonalizedNutritionCard(
+  reply: string,
+  context: MapAssistantReplyContext
+): ArchieStructuredResponse {
+  const cleaned = stripUnnecessaryFollowUp(reply);
+  const sentences = splitSentences(cleaned);
+  const summary = sentences[0] || buildSummary(cleaned) || cleaned;
+  const remaining = sentences.slice(1);
+
+  const preferenceSentence = findSentence(
+    remaining,
+    /\b(for your|your (low[\s-]?fat|low[\s-]?sodium|goal|preference)|choose (a )?(low[\s-]?fat|fat[\s-]?free|lower[\s-]?sodium)|compare (brands|labels))\b/i
+  );
+  const watchSentence = findSentence(
+    remaining,
+    /\b(however|watch|but |sodium|salty|full[\s-]?fat|flavored|added sugar|caution|trade[\s-]?off|vary)\b/i
+  );
+
+  const sections = removeOverlappingSections(summary, [
+    preferenceSentence
+      ? { key: "preferenceFit", label: "For your goals", value: preferenceSentence }
+      : { key: "preferenceFit", label: "For your goals", value: "" },
+    watchSentence
+      ? { key: "watchOut", label: "Watch out", value: watchSentence }
+      : { key: "watchOut", label: "Watch out", value: "" }
+  ]);
+
+  void context.dietaryGoals;
 
   return {
-    title: isRecipeQuestion ? "Archie's recommendation" : "Archie's answer",
-    summary:
-      parsed.summary ||
-      "Cottage cheese can be a good option if you're aiming for a lower-fat, higher-protein diet. Choose a low-fat variety and check the sodium content.",
-    howToUse:
-      parsed.howToUse ??
-      `Cottage cheese can work as a lighter substitute in ${recipeTitle} if you blend it first, then stir it in on low heat.`,
-    dietaryFit:
-      parsed.dietaryFit ??
-      "It can support low-fat goals if you use low-fat cottage cheese. Check sodium, because cottage cheese can be salty.",
-    watchOut:
-      parsed.watchOut ??
-      "Texture and flavor will be tangier and less silky than heavy cream. Do not boil after adding.",
-    recipeUpdate: isRecipeQuestion
-      ? parsed.recipeUpdate ??
-        "Reduce heat to low. Blend cottage cheese with warm soup until smooth, then stir it in gently."
-      : undefined
+    title: "Archie's answer",
+    summary,
+    preferenceFit: sections.find((section) => section.key === "preferenceFit")?.value,
+    watchOut: sections.find((section) => section.key === "watchOut")?.value
   };
 }
 
@@ -274,18 +326,27 @@ function buildGenericFoodCard(
   context: MapAssistantReplyContext,
   options?: { isImageResponse?: boolean; identified?: string; title?: ArchieResponseTitle }
 ): ArchieStructuredResponse {
-  const parsed = parsePlainFoodReply(reply);
+  const cleaned = stripUnnecessaryFollowUp(reply);
+  const parsed = parsePlainFoodReply(cleaned);
   const isRecipeQuestion = isRecipeChangeQuestion(context.userMessage) || options?.isImageResponse;
+  const summary = parsed.summary || buildSummary(cleaned);
+  const allowUsageSections = Boolean(options?.isImageResponse || isRecipeQuestion);
+
+  const sectionOrUndefined = (value: string | undefined) => {
+    if (!value) return undefined;
+    if (isSemanticallyDuplicate(value, summary)) return undefined;
+    return value;
+  };
 
   return {
     title: options?.title ?? (isRecipeQuestion ? "Archie's recommendation" : "Archie's answer"),
-    summary: parsed.summary || buildSummary(reply),
+    summary,
     isImageResponse: options?.isImageResponse,
     identified: options?.isImageResponse ? options.identified : undefined,
-    howToUse: parsed.howToUse,
-    dietaryFit: parsed.dietaryFit,
-    watchOut: parsed.watchOut,
-    recipeUpdate: parsed.recipeUpdate
+    howToUse: allowUsageSections ? sectionOrUndefined(parsed.howToUse) : undefined,
+    dietaryFit: allowUsageSections ? sectionOrUndefined(parsed.dietaryFit) : undefined,
+    watchOut: sectionOrUndefined(parsed.watchOut),
+    recipeUpdate: allowUsageSections ? sectionOrUndefined(parsed.recipeUpdate) : undefined
   };
 }
 
@@ -367,10 +428,15 @@ export function mapAssistantReplyToStructured(
   reply: string,
   context: MapAssistantReplyContext = {}
 ): ArchieStructuredResponse | null {
-  const trimmed = reply.trim();
+  const trimmed = stripUnnecessaryFollowUp(reply.trim());
   if (!trimmed) return null;
 
-  if (isConversationalPrompt(trimmed) || isScopeDeclineReply(trimmed)) {
+  if (isConversationalPrompt(trimmed) || isScopeDeclineReply(trimmed) || isClarificationStyleReply(trimmed)) {
+    return null;
+  }
+
+  // Recommendation / comparison answers stay as plain bubbles.
+  if (context.userMessage && isIngredientRecommendationRequest(context.userMessage)) {
     return null;
   }
 
@@ -398,12 +464,30 @@ export function mapAssistantReplyToStructured(
     return finalizeStructuredResponse(buildClarificationCard(ingredientResolution.options), context, trimmed);
   }
 
-  if (
-    ingredientResolution.kind === "resolved" &&
-    ingredientResolution.ingredient === "cottage cheese" &&
-    !context.hasImage
-  ) {
-    return finalizeStructuredResponse(buildCottageCheeseTextCard(trimmed, context), context, trimmed);
+  const hasDietaryGoals = Boolean(context.dietaryGoals && context.dietaryGoals.length > 0);
+  const isNutritionAsk =
+    Boolean(context.userMessage) && isNutritionQualityUserMessage(context.userMessage!);
+
+  if (isNutritionAsk && !context.hasImage) {
+    return finalizeStructuredResponse(
+      buildPersonalizedNutritionCard(trimmed, context),
+      context,
+      trimmed
+    );
+  }
+
+  // Non-personalized nutrition: prefer summary-focused cards without howToUse.
+  if (isNutritionAsk && !hasDietaryGoals && !context.hasImage) {
+    const cleaned = stripUnnecessaryFollowUp(trimmed);
+    return finalizeStructuredResponse(
+      {
+        title: "Archie's answer",
+        summary: buildSummary(cleaned, 3),
+        watchOut: undefined
+      },
+      context,
+      trimmed
+    );
   }
 
   const identified =
@@ -458,13 +542,33 @@ export function mapChatResponseToStructured(
   });
 }
 
+export function structuredResponseToHistoryText(response: ArchieStructuredResponse): string {
+  return [
+    response.summary,
+    response.preferenceFit,
+    response.howToUse,
+    response.dietaryFit,
+    response.watchOut,
+    response.recipeUpdate,
+    response.whyThisWorks,
+    response.nutritionNote,
+    response.nextStep
+  ]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 export function formatAssistantMessage(
   reply: string,
   context: MapAssistantReplyContext = {}
 ): { text: string; structuredResponse?: ArchieStructuredResponse } {
   const structuredResponse = mapAssistantReplyToStructured(reply, context);
   if (structuredResponse) {
-    return { text: "", structuredResponse };
+    return {
+      text: structuredResponseToHistoryText(structuredResponse),
+      structuredResponse
+    };
   }
   return { text: reply };
 }

@@ -198,7 +198,9 @@ export function ArchieScreen() {
               .find((item) => item.role === "user");
 
             const structuredResponse =
-              message.role === "assistant"
+              message.role === "assistant" &&
+              !message.plainBubble &&
+              (message.structuredResponse || message.recommendation)
                 ? resolveMessageStructuredResponse(message, {
                     hasImage: Boolean(priorUserMessage?.imageUri),
                     userMessage: priorUserMessage?.text
@@ -220,7 +222,7 @@ export function ArchieScreen() {
                     styles.bubble,
                     message.role === "user" ? styles.userBubble : styles.assistBubble,
                     {
-                      backgroundColor: message.role === "user" ? colors.borderLight : colors.canvas
+                      backgroundColor: message.role === "user" ? colors.borderLight : colors.surface
                     }
                   ]}
                 >
@@ -244,19 +246,19 @@ export function ArchieScreen() {
           })}
 
           {assistantPhase === "pick_recipe" ? (
-            <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
+            <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.surface }]}>
               <RecipePickerCards />
             </View>
           ) : null}
 
           {assistantPhase === "pick_ingredient" ? (
-            <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
+            <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.surface }]}>
               <IngredientPickerCards />
             </View>
           ) : null}
 
           {assistantPhase === "awaiting_substitute" ? (
-            <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.canvas }]}>
+            <View style={[styles.bubble, styles.assistBubble, { backgroundColor: colors.surface }]}>
               <SubstitutePromptChips />
             </View>
           ) : null}

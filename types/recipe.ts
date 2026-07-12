@@ -98,7 +98,10 @@ export type ArchieStructuredResponse = {
   isImageResponse?: boolean;
   identified?: string;
   howToUse?: string;
+  /** @deprecated Prefer preferenceFit for personalized nutrition */
   dietaryFit?: string;
+  /** How the food aligns with the user's known dietary goals. */
+  preferenceFit?: string;
   watchOut?: string;
   recipeUpdate?: string;
   whyThisWorks?: string;
@@ -123,6 +126,10 @@ export type ArchieChatMessage = {
   /** @deprecated Use structuredResponse */
   recommendation?: ArchieImageRecommendation;
   structuredResponse?: ArchieStructuredResponse;
+  /** When true, always render as a plain bubble — never remap into a structured card. */
+  plainBubble?: boolean;
+  /** Ties assistant replies to a single in-flight chat request. */
+  requestId?: number;
 };
 
 export type ComposerSheetMode = "image-source" | "recipe-picker" | null;
@@ -154,6 +161,8 @@ export type RecipeCatalogItem = {
 
 export type ArchieSessionKind = "general" | "recipe_swap";
 
+export type ArchieRecipeContextSource = "explicit_attach" | "recipe_entry";
+
 export type ArchieLastApplied = {
   ingredientId: string;
   originalItem: string;
@@ -178,6 +187,8 @@ export type ArchieChatSession = {
   kind: ArchieSessionKind;
   title: string;
   recipeId?: string;
+  /** Provenance for recipeId — required for general sessions to send recipe context. */
+  recipeContextSource?: ArchieRecipeContextSource;
   ingredientId?: string;
   messages: ArchieChatMessage[];
   swapState: ArchieSwapState;

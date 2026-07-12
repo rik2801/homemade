@@ -22,8 +22,20 @@ import {
   pickEvictionCandidate,
   pruneExpiredSessions
 } from "@/lib/archieSessionStorage";
-import { inferArchieIntent, messageNeedsRecipeContext } from "@/lib/inferArchieIntent";
-import { mapChatResponseToStructured } from "@/lib/mapArchieStructuredResponse";
+import {
+  resolveExplicitArchieRecipeId,
+  serializeArchieChatRecipe
+} from "@/lib/archieChatContext";
+import { canBeginArchieSend, shouldAppendAssistantForRequest } from "@/lib/archieSendGuard";
+import {
+  inferArchieIntentResult,
+  messageNeedsRecipeContext
+} from "@/lib/inferArchieIntent";
+import {
+  mapChatResponseToStructured,
+  structuredResponseToHistoryText
+} from "@/lib/mapArchieStructuredResponse";
+import { stripUnnecessaryFollowUp } from "@/lib/archieAnswerFormatting";
 import { readImageAsDataUrl } from "@/lib/chatImage";
 import { runSwapGeneration } from "@/services/assistantService";
 import { requestArchieChat } from "@/services/aiClient";
@@ -33,6 +45,7 @@ import type {
   ArchieChatMessage,
   ArchieChatSession,
   ArchieLastApplied,
+  ArchieRecipeContextSource,
   ArchieSessionKind,
   ArchieSwapState,
   AssistantContext,
@@ -83,6 +96,8 @@ type AppState = {
   assistantReply: string | null;
   chatLoading: boolean;
   chatRequestId: number;
+  /** Non-null while a network Archie send is in flight (sync single-flight lock). */
+  archieSendLockId: string | null;
   anotherOptionLoading: boolean;
   recipeConfirmation: string;
   ingredientConfirmation: string;
@@ -130,6 +145,7 @@ type AppState = {
   clearComposerAttachments: () => void;
   selectComposerRecipe: (recipeId: string) => void;
   clearComposerActiveRecipe: () => void;
+  clearArchieRecipeContext: () => void;
   requestRecipeContext: (message: string) => void;
   submitComposerMessage: (text: string) => void;
   setAssistantPhase: (phase: AssistantPhase) => void;
@@ -209,7 +225,8 @@ function resetChatRootState() {
     composerImageUri: null,
     composerActiveRecipeId: null,
     pendingComposerMessage: null,
-    composerSheetMode: null as ComposerSheetMode
+    composerSheetMode: null as ComposerSheetMode,
+    archieSendLockId: null
   };
 }
 
@@ -261,6 +278,7 @@ function createSessionRecord(
     ingredientId?: string;
     messages?: ArchieChatMessage[];
     swapState?: ArchieSwapState;
+    recipeContextSource?: ArchieRecipeContextSource;
   }
 ): ArchieChatSession {
   const now = Date.now();
@@ -269,6 +287,7 @@ function createSessionRecord(
     kind,
     title: "New chat",
     recipeId: options?.recipeId,
+    recipeContextSource: options?.recipeContextSource,
     ingredientId: options?.ingredientId,
     messages: options?.messages ?? [],
     swapState: options?.swapState ?? blankSwapState(),
@@ -333,6 +352,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   assistantReply: null,
   chatLoading: false,
   chatRequestId: 0,
+  archieSendLockId: null,
   anotherOptionLoading: false,
   recipeConfirmation: "",
   ingredientConfirmation: "",
@@ -561,6 +581,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Recipe context known while already chatting: stay in the current session.
     if (fromRecipe && currentTab === "archie") {
       const swapUserMessage = userMessageFor(ingredient);
+      const { activeSessionId } = get();
       set((state) => ({
         selectedIngredientId: ingredientId,
         ...resetSwapConversation(),
@@ -578,7 +599,20 @@ export const useAppStore = create<AppState>((set, get) => ({
         ),
         userMessage: swapUserMessage,
         targetRecipeId: recipe.id,
-        assistantPhase: "awaiting_substitute" as AssistantPhase
+        composerActiveRecipeId: recipe.id,
+        assistantPhase: "awaiting_substitute" as AssistantPhase,
+        archieSessions: state.archieSessions.map((session) =>
+          session.id === activeSessionId
+            ? {
+                ...session,
+                recipeId: recipe.id,
+                recipeContextSource:
+                  session.kind === "recipe_swap"
+                    ? session.recipeContextSource ?? ("recipe_entry" as const)
+                    : ("explicit_attach" as const)
+              }
+            : session
+        )
       }));
       return;
     }
@@ -637,7 +671,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         recipeId: recipe.id,
         ingredientId,
         messages,
-        swapState
+        swapState,
+        recipeContextSource: "recipe_entry"
       });
 
       set({
@@ -772,7 +807,23 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearComposerAttachments: () => set({ composerImageUri: null }),
 
-  clearComposerActiveRecipe: () => set({ composerActiveRecipeId: null }),
+  clearComposerActiveRecipe: () => get().clearArchieRecipeContext(),
+
+  clearArchieRecipeContext: () => {
+    const { activeSessionId } = get();
+    set((state) => ({
+      composerActiveRecipeId: null,
+      archieSessions: state.archieSessions.map((session) =>
+        session.id === activeSessionId
+          ? {
+              ...session,
+              recipeId: undefined,
+              recipeContextSource: undefined
+            }
+          : session
+      )
+    }));
+  },
 
   selectComposerRecipe: (recipeId) => {
     const recipe = getRecipeById(recipeId);
@@ -780,16 +831,26 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const substitutions = substitutionsForRecipe(get().appliedSubstitutions, recipeId);
     const pendingMessage = get().pendingComposerMessage;
+    const { activeSessionId } = get();
 
-    set({
+    set((state) => ({
       ...loadRecipeState(recipe, substitutions),
       composerActiveRecipeId: recipeId,
       composerSheetMode: null,
       targetRecipeId: recipeId,
       assistantContext: "recipe",
       assistantPhase: "idle",
-      pendingComposerMessage: null
-    });
+      pendingComposerMessage: null,
+      archieSessions: state.archieSessions.map((session) =>
+        session.id === activeSessionId
+          ? {
+              ...session,
+              recipeId,
+              recipeContextSource: "explicit_attach" as const
+            }
+          : session
+      )
+    }));
 
     get().requestComposerFocus();
 
@@ -825,7 +886,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const phase = get().assistantPhase;
     if (phase === "loading" || phase === "pick_recipe" || phase === "pick_ingredient") return;
-    if (get().chatLoading) return;
+
+    if (
+      !canBeginArchieSend({
+        chatLoading: get().chatLoading,
+        archieSendLockId: get().archieSendLockId
+      })
+    ) {
+      return;
+    }
 
     if (imageUriToSend) {
       get().sendArchieChat(messageText, imageUriToSend);
@@ -993,14 +1062,30 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   sendArchieChat: (text, imageUri) => {
-    const { recipe, chatMessages, activeSessionId } = get();
-    const requestId = get().chatRequestId + 1;
+    const state = get();
+
+    if (
+      !canBeginArchieSend({
+        chatLoading: state.chatLoading,
+        archieSendLockId: state.archieSendLockId
+      })
+    ) {
+      return;
+    }
+
+    const { chatMessages, activeSessionId } = state;
+    const explicitRecipeId = resolveExplicitArchieRecipeId(state);
+    const attachedRecipe = explicitRecipeId ? getRecipeById(explicitRecipeId) : null;
+    const requestId = state.chatRequestId + 1;
+    const lockId = `send-${requestId}`;
     const nextMessages = appendChatMessages(chatMessages, {
       role: "user",
       text,
+      requestId,
       ...(imageUri ? { imageUri } : {})
     });
 
+    // Acquire lock synchronously before any async work so double-taps cannot race.
     set({
       chatMessages: nextMessages,
       userMessage: text,
@@ -1008,6 +1093,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       assistantReply: null,
       chatLoading: true,
       chatRequestId: requestId,
+      archieSendLockId: lockId,
       assistantPhase: "idle",
       archieComposerDraft: ""
     });
@@ -1019,6 +1105,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       const isStale = () =>
         get().chatRequestId !== requestId || get().activeSessionId !== activeSessionId;
 
+      const clearSendLock = () => {
+        if (get().archieSendLockId === lockId) {
+          set({ chatLoading: false, archieSendLockId: null });
+        } else {
+          set({ chatLoading: false });
+        }
+      };
+
       try {
         const response = await requestArchieChat({
           message: text,
@@ -1028,50 +1122,81 @@ export const useAppStore = create<AppState>((set, get) => ({
             role: item.role,
             content: item.text
           })),
-          recipe: {
-            id: recipe.id,
-            title: recipe.title,
-            ingredients: recipe.ingredients.map((item) => ({
-              id: item.id,
-              amount: item.amount,
-              label: item.label
-            })),
-            steps: recipe.steps
-          },
+          ...(attachedRecipe
+            ? {
+                recipe: serializeArchieChatRecipe(attachedRecipe),
+                recipeExplicitlyAttached: true as const
+              }
+            : {}),
           dietaryGoals: get().dietaryGoals,
           allergies: get().allergies,
           cookingFor: get().cookingFor,
           pantryMode: get().pantryMode
         });
 
-        if (isStale()) return;
+        if (isStale()) {
+          clearSendLock();
+          return;
+        }
 
         const structuredResponse = mapChatResponseToStructured(response, {
           userMessage: text,
-          recipeTitle: recipe.title,
+          recipeTitle: attachedRecipe?.title,
           source: response.source,
-          hasImage: Boolean(imageUri)
+          hasImage: Boolean(imageUri),
+          dietaryGoals: get().dietaryGoals
         });
 
-        set((state) => ({
-          chatLoading: false,
-          assistantReply: null,
-          chatMessages: appendChatMessages(state.chatMessages, {
-            role: "assistant",
-            text: structuredResponse ? "" : response.reply,
-            ...(structuredResponse ? { structuredResponse } : {})
-          })
-        }));
+        const assistantText = structuredResponse
+          ? structuredResponseToHistoryText(structuredResponse)
+          : stripUnnecessaryFollowUp(response.reply);
+
+        set((current) => {
+          if (!shouldAppendAssistantForRequest(current.chatMessages, requestId)) {
+            return {
+              chatLoading: false,
+              archieSendLockId: current.archieSendLockId === lockId ? null : current.archieSendLockId,
+              assistantReply: null
+            };
+          }
+
+          return {
+            chatLoading: false,
+            archieSendLockId: current.archieSendLockId === lockId ? null : current.archieSendLockId,
+            assistantReply: null,
+            chatMessages: appendChatMessages(current.chatMessages, {
+              role: "assistant",
+              text: assistantText,
+              requestId,
+              ...(structuredResponse ? { structuredResponse } : { plainBubble: true })
+            })
+          };
+        });
       } catch {
-        if (isStale()) return;
-        set((state) => ({
-          chatLoading: false,
-          assistantReply: null,
-          chatMessages: appendChatMessages(state.chatMessages, {
-            role: "assistant",
-            text: imageUri ? ARCHIE_CHAT_ERROR_MSG : UNKNOWN_INGREDIENT_MSG
-          })
-        }));
+        if (isStale()) {
+          clearSendLock();
+          return;
+        }
+        set((current) => {
+          if (!shouldAppendAssistantForRequest(current.chatMessages, requestId)) {
+            return {
+              chatLoading: false,
+              archieSendLockId: current.archieSendLockId === lockId ? null : current.archieSendLockId,
+              assistantReply: null
+            };
+          }
+
+          return {
+            chatLoading: false,
+            archieSendLockId: current.archieSendLockId === lockId ? null : current.archieSendLockId,
+            assistantReply: null,
+            chatMessages: appendChatMessages(current.chatMessages, {
+              role: "assistant",
+              text: imageUri ? ARCHIE_CHAT_ERROR_MSG : UNKNOWN_INGREDIENT_MSG,
+              requestId
+            })
+          };
+        });
       }
     })();
   },
@@ -1088,7 +1213,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     if (phase === "loading" || phase === "pick_recipe" || phase === "pick_ingredient") return;
-    if (get().chatLoading) return;
 
     const normalized = text.toLowerCase();
     const isSwapIntent =
@@ -1102,18 +1226,68 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    if (!get().composerActiveRecipeId && messageNeedsRecipeContext(text)) {
+    const state = get();
+    const explicitRecipeId = resolveExplicitArchieRecipeId(state);
+    const hasAttachedRecipe = Boolean(explicitRecipeId);
+
+    const previousUserMessage = [...state.chatMessages]
+      .reverse()
+      .find((message) => message.role === "user")?.text;
+    const previousAssistantMessage = [...state.chatMessages]
+      .reverse()
+      .find((message) => message.role === "assistant")?.text;
+
+    const intent = inferArchieIntentResult({
+      text,
+      hasAttachedRecipe,
+      previousUserMessage,
+      previousAssistantMessage
+    });
+
+    if (__DEV__) {
+      console.info("[archie] intent", intent);
+    }
+
+    if (intent.type === "unclear") {
+      set((current) => ({
+        chatMessages: appendChatMessages(
+          current.chatMessages,
+          { role: "user", text },
+          { role: "assistant", text: intent.clarification, plainBubble: true }
+        ),
+        userMessage: text,
+        unknownHint: null,
+        assistantReply: null,
+        chatLoading: false,
+        archieSendLockId: null,
+        assistantPhase: "idle",
+        archieComposerDraft: ""
+      }));
+      return;
+    }
+
+    if (!hasAttachedRecipe && messageNeedsRecipeContext(text)) {
       get().requestRecipeContext(text);
       return;
     }
 
-    const intent = inferArchieIntent(text);
-    const { recipe } = get();
+    // Network-bound path: refuse if a send is already in flight.
+    if (
+      !canBeginArchieSend({
+        chatLoading: get().chatLoading,
+        archieSendLockId: get().archieSendLockId
+      })
+    ) {
+      return;
+    }
 
-    if (intent === "recipe_alteration" || intent === "substitution") {
-      const ingredientId = resolveIngredientIdFromText(recipe, text);
+    const attachedRecipe = explicitRecipeId ? getRecipeById(explicitRecipeId) : null;
+    const recipeForSwap = attachedRecipe ?? get().recipe;
+
+    if (intent.type === "recipe_alteration" || intent.type === "substitution") {
+      const ingredientId = resolveIngredientIdFromText(recipeForSwap, text);
       if (ingredientId) {
-        get().startSwap(ingredientId, Boolean(get().composerActiveRecipeId));
+        get().startSwap(ingredientId, hasAttachedRecipe);
         return;
       }
       get().sendArchieChat(text);

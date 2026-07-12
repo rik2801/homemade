@@ -67,12 +67,14 @@ export type ChatApiRequest = {
   imageDataUrl?: string;
   imageFilename?: string;
   history: Array<{ role: "user" | "assistant"; content: string }>;
-  recipe: {
+  recipe?: {
     id: string;
     title: string;
     ingredients: Array<{ id?: string; amount: string; label: string }>;
     steps: string[];
   };
+  /** Must be true when recipe is present; backend ignores recipe otherwise. */
+  recipeExplicitlyAttached?: boolean;
   dietaryGoals: string[];
   allergies: string[];
   cookingFor: string;
