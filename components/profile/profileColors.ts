@@ -30,12 +30,12 @@ export const PROFILE_COLORS = {
   tertiaryText: "#98A1AE",
   summarySubtitle: "#5E6878",
 
-  chipBackground: "#FFF6D0",
-  chipBorder: "#F0C94A",
+  chipBackground: "#FFF8CC",
+  chipBorder: "#E6C200",
   chipText: "#384152",
 
   switchInactive: "#DEDCD7",
-  switchActive: "#FFDB58",
+  switchActive: "#FFD700",
 
   rowPressed: "#FAF8F4",
   separator: "#ECE8E1"

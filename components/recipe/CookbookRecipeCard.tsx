@@ -33,8 +33,11 @@ export function CookbookRecipeCard({
   onPress,
   onOpenReasons
 }: CookbookRecipeCardProps) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const hasBadges = badges.length > 0;
+  const recommendedBackground = isDark ? "#166534" : colors.greenSoft;
+  const recommendedBorder = isDark ? "#4ADE80" : "#155A19";
+  const recommendedText = isDark ? "#FFFFFF" : "#155A19";
 
   async function handlePress() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -60,8 +63,13 @@ export function CookbookRecipeCard({
       <View style={styles.imageWrap}>
         <SoupHeroIllustration recipeId={recipeId} height={CARD_IMAGE_HEIGHT} />
         {featured ? (
-          <View style={[styles.recommendedBadge, { backgroundColor: colors.greenSoft, borderColor: "#155A19" }]}>
-            <AppText style={[styles.recommendedText, { color: "#155A19" }]}>Recommended</AppText>
+          <View
+            style={[
+              styles.recommendedBadge,
+              { backgroundColor: recommendedBackground, borderColor: recommendedBorder }
+            ]}
+          >
+            <AppText style={[styles.recommendedText, { color: recommendedText }]}>Recommended</AppText>
           </View>
         ) : null}
         {featured && onOpenReasons ? (
