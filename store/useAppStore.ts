@@ -390,7 +390,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           archieSessions: sessions,
           activeTab: "archie",
           returnTab: current,
-          toastMessage: "Chat limit reached — delete a chat to start a new one"
+          toastMessage: "Chat limit reached — delete a chat to start a new one",
+          profileSheetVisible: false,
+          profileSheetMode: null
         });
         if (latest) get().switchSession(latest.id);
         setTimeout(() => set({ toastMessage: null }), 2500);
@@ -405,14 +407,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         archieSidebarOpen: false,
         chatRequestId: state.chatRequestId + 1,
         activeTab: "archie",
-        returnTab: current
+        returnTab: current,
+        profileSheetVisible: false,
+        profileSheetMode: null
       });
       return;
     }
 
     set({
       activeTab: tab,
-      recipesView: tab === "recipes" ? "list" : get().recipesView
+      recipesView: tab === "recipes" ? "list" : get().recipesView,
+      profileSheetVisible: false,
+      profileSheetMode: null
     });
   },
 

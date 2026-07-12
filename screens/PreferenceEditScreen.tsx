@@ -1,8 +1,9 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { BottomSheet } from "@/components/layout/BottomSheet";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/primitives/AppText";
+import { PROFILE_COLORS } from "@/components/profile/profileColors";
 import {
   ALLERGY_OPTIONS,
   COOKING_FOR_OPTIONS,
@@ -14,11 +15,26 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
 import type { ProfileSheetMode } from "@/store/useAppStore";
 import { fontFamily } from "@/theme/typography";
-import { radius, spacing } from "@/theme/spacing";
+import { layout, radius, spacing } from "@/theme/spacing";
 
-export function PreferenceEditSheet() {
-  const { colors } = useAppTheme();
-  const visible = useAppStore((state) => state.profileSheetVisible);
+export function preferenceEditTitle(mode: ProfileSheetMode) {
+  switch (mode) {
+    case "cookingFor":
+      return "Cooking for";
+    case "dietaryGoals":
+      return "Dietary goals";
+    case "allergies":
+      return "Allergies / Avoid";
+    case "pantryMode":
+      return "Pantry behavior";
+    default:
+      return "Preferences";
+  }
+}
+
+export function PreferenceEditScreen() {
+  const { colors, isDark } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const mode = useAppStore((state) => state.profileSheetMode);
   const closeProfileSheet = useAppStore((state) => state.closeProfileSheet);
   const cookingFor = useAppStore((state) => state.cookingFor);
@@ -36,12 +52,13 @@ export function PreferenceEditSheet() {
   const [draftPantryMode, setDraftPantryMode] = useState<PantryMode>(pantryMode);
 
   useEffect(() => {
-    if (!visible) return;
     setDraftCookingFor(cookingFor);
     setDraftDietaryGoals([...dietaryGoals]);
     setDraftAllergies([...allergies]);
     setDraftPantryMode(pantryMode);
-  }, [visible, cookingFor, dietaryGoals, allergies, pantryMode]);
+  }, [mode, cookingFor, dietaryGoals, allergies, pantryMode]);
+
+  const pageBackground = isDark ? colors.background : PROFILE_COLORS.pageBackground;
 
   function toggleItem(list: string[], value: string) {
     return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
@@ -57,11 +74,17 @@ export function PreferenceEditSheet() {
   }
 
   return (
-    <BottomSheet visible={visible} onClose={closeProfileSheet} title={sheetTitle(mode)}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+    <View style={[styles.screen, { backgroundColor: pageBackground }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom, spacing.lg) + spacing.xxl }
+        ]}
+      >
         {mode === "cookingFor"
           ? COOKING_FOR_OPTIONS.map((option) => (
-              <SheetOption
+              <PreferenceOption
                 key={option}
                 label={option}
                 selected={draftCookingFor === option}
@@ -72,7 +95,7 @@ export function PreferenceEditSheet() {
 
         {mode === "dietaryGoals"
           ? DIETARY_GOAL_OPTIONS.map((option) => (
-              <SheetOption
+              <PreferenceOption
                 key={option}
                 label={option}
                 selected={draftDietaryGoals.includes(option)}
@@ -83,7 +106,7 @@ export function PreferenceEditSheet() {
 
         {mode === "allergies"
           ? ALLERGY_OPTIONS.map((option) => (
-              <SheetOption
+              <PreferenceOption
                 key={option}
                 label={option}
                 selected={draftAllergies.includes(option)}
@@ -94,7 +117,7 @@ export function PreferenceEditSheet() {
 
         {mode === "pantryMode"
           ? PANTRY_MODE_OPTIONS.map((option) => (
-              <SheetOption
+              <PreferenceOption
                 key={option.value}
                 label={option.label}
                 selected={draftPantryMode === option.value}
@@ -102,7 +125,18 @@ export function PreferenceEditSheet() {
               />
             ))
           : null}
+      </ScrollView>
 
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingBottom: Math.max(insets.bottom, spacing.lg),
+            backgroundColor: pageBackground,
+            borderTopColor: isDark ? colors.border : PROFILE_COLORS.cardBorder
+          }
+        ]}
+      >
         <Pressable
           accessibilityRole="button"
           onPress={handleSave}
@@ -110,27 +144,12 @@ export function PreferenceEditSheet() {
         >
           <AppText style={[styles.saveLabel, { color: colors.brandOnBrand }]}>Save</AppText>
         </Pressable>
-      </ScrollView>
-    </BottomSheet>
+      </View>
+    </View>
   );
 }
 
-function sheetTitle(mode: ProfileSheetMode) {
-  switch (mode) {
-    case "cookingFor":
-      return "Cooking for";
-    case "dietaryGoals":
-      return "Dietary goals";
-    case "allergies":
-      return "Allergies / avoid";
-    case "pantryMode":
-      return "Pantry behavior";
-    default:
-      return "Preferences";
-  }
-}
-
-function SheetOption({
+function PreferenceOption({
   label,
   selected,
   onPress
@@ -158,38 +177,49 @@ function SheetOption({
           : { backgroundColor: colors.surface, borderColor: colors.border }
       ]}
     >
-      <AppText style={[styles.optionText, { color: selected ? colors.brandOnBrand : colors.text }]}>{label}</AppText>
+      <AppText style={[styles.optionText, { color: selected ? colors.brandOnBrand : colors.text }]}>
+        {label}
+      </AppText>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1
+  },
   content: {
     gap: spacing.sm,
-    paddingBottom: spacing.md
+    paddingHorizontal: layout.screenPadding,
+    paddingTop: spacing.sm
   },
   option: {
     borderRadius: radius.md,
     borderWidth: 1,
     minHeight: 48,
     paddingHorizontal: spacing.md,
-    paddingVertical: 13
+    paddingVertical: 13,
+    justifyContent: "center"
   },
   optionText: {
     fontFamily,
-    fontSize: 15,
-    fontWeight: "500"
+    fontSize: 14,
+    fontWeight: "400"
+  },
+  footer: {
+    paddingHorizontal: layout.screenPadding,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth
   },
   saveBtn: {
     alignItems: "center",
     borderRadius: radius.md,
     justifyContent: "center",
-    marginTop: spacing.sm,
     minHeight: 48
   },
   saveLabel: {
     fontFamily,
-    fontSize: 15,
-    fontWeight: "600"
+    fontSize: 14,
+    fontWeight: "500"
   }
 });

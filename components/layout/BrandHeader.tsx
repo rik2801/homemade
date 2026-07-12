@@ -4,8 +4,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { ArchieLogo } from "@/components/brand/ArchieLogo";
 import { HomemadeLogo } from "@/components/brand/HomemadeLogo";
+import { AppText } from "@/components/primitives/AppText";
+import { SettingsGearIcon } from "@/components/profile/ProfileIcons";
+import { PROFILE_COLORS } from "@/components/profile/profileColors";
+import { preferenceEditTitle } from "@/screens/PreferenceEditScreen";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
+import { fontFamily } from "@/theme/typography";
 import { layout } from "@/theme/spacing";
 
 function ChevronLeft({ color }: { color: string }) {
@@ -28,11 +33,22 @@ function ChatHistoryIcon({ color }: { color: string }) {
 
 export function BrandHeader() {
   const insets = useSafeAreaInsets();
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const activeTab = useAppStore((state) => state.activeTab);
   const exitArchie = useAppStore((state) => state.exitArchie);
   const openArchieSidebar = useAppStore((state) => state.openArchieSidebar);
+  const openArchSheet = useAppStore((state) => state.openArchSheet);
+  const profileSheetVisible = useAppStore((state) => state.profileSheetVisible);
+  const profileSheetMode = useAppStore((state) => state.profileSheetMode);
+  const closeProfileSheet = useAppStore((state) => state.closeProfileSheet);
   const isArchie = activeTab === "archie";
+  const isProfile = activeTab === "profile";
+  const isPreferenceEdit = isProfile && profileSheetVisible;
+  const headerBackground = isArchie
+    ? "transparent"
+    : (isProfile || isPreferenceEdit) && !isDark
+      ? PROFILE_COLORS.pageBackground
+      : colors.background;
 
   async function handleBack() {
     await Haptics.selectionAsync();
@@ -44,13 +60,23 @@ export function BrandHeader() {
     openArchieSidebar();
   }
 
+  async function handleOpenSettings() {
+    await Haptics.selectionAsync();
+    openArchSheet();
+  }
+
+  async function handleClosePreferenceEdit() {
+    await Haptics.selectionAsync();
+    closeProfileSheet();
+  }
+
   return (
     <View
       style={[
         styles.header,
         {
           paddingTop: insets.top + layout.headerPaddingTop,
-          backgroundColor: isArchie ? "transparent" : colors.background
+          backgroundColor: headerBackground
         }
       ]}
     >
@@ -76,6 +102,38 @@ export function BrandHeader() {
             style={styles.sideButton}
           >
             <ChatHistoryIcon color={colors.text} />
+          </Pressable>
+        </View>
+      ) : isPreferenceEdit ? (
+        <View style={styles.profileBar}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back to profile"
+            hitSlop={8}
+            onPress={handleClosePreferenceEdit}
+            style={styles.backButton}
+          >
+            <ChevronLeft color={isDark ? colors.text : PROFILE_COLORS.primaryText} />
+          </Pressable>
+          <View pointerEvents="none" style={styles.logoOverlay}>
+            <AppText style={[styles.editTitle, { color: isDark ? colors.text : PROFILE_COLORS.primaryText }]}>
+              {preferenceEditTitle(profileSheetMode)}
+            </AppText>
+          </View>
+        </View>
+      ) : isProfile ? (
+        <View style={styles.profileBar}>
+          <View pointerEvents="none" style={styles.logoOverlay}>
+            <HomemadeLogo align="center" height={32} />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open settings"
+            hitSlop={8}
+            onPress={handleOpenSettings}
+            style={styles.settingsButton}
+          >
+            <SettingsGearIcon color={isDark ? colors.text : PROFILE_COLORS.brandGreen} />
           </Pressable>
         </View>
       ) : (
@@ -114,5 +172,36 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "visible",
     zIndex: 0
+  },
+  profileBar: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    position: "relative",
+    width: "100%"
+  },
+  backButton: {
+    position: "absolute",
+    left: 0,
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1
+  },
+  settingsButton: {
+    position: "absolute",
+    right: 0,
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1
+  },
+  editTitle: {
+    fontFamily,
+    fontSize: 16,
+    fontWeight: "400",
+    letterSpacing: -0.2
   }
 });

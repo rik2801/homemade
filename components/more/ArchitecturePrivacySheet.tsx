@@ -15,6 +15,14 @@ const PRIVACY_NOTES = [
   "Only recipe context and user-entered substitute are sent"
 ] as const;
 
+const PROTOTYPE_NOTES = [
+  "No real LLM call in prototype",
+  "No patient identifiers sent",
+  "No pantry database",
+  "User-provided ingredient context only",
+  "Rule-based fallback available"
+] as const;
+
 export function ArchitecturePrivacySheet() {
   const { colors } = useAppTheme();
   const visible = useAppStore((state) => state.archSheetVisible);
@@ -70,6 +78,21 @@ export function ArchitecturePrivacySheet() {
               </AppText>
             </View>
           ))}
+        </View>
+
+        <View style={styles.section}>
+          <AppText style={styles.sectionTitle}>Prototype notes</AppText>
+          {PROTOTYPE_NOTES.map((note) => (
+            <View key={note} style={styles.noteRow}>
+              <View style={[styles.bullet, { backgroundColor: colors.brand }]} />
+              <AppText muted style={styles.noteText}>
+                {note}
+              </AppText>
+            </View>
+          ))}
+          <AppText muted style={styles.version}>
+            Prototype v1
+          </AppText>
         </View>
       </ScrollView>
     </BottomSheet>
@@ -136,5 +159,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     lineHeight: 20
+  },
+  version: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: spacing.sm
   }
 });

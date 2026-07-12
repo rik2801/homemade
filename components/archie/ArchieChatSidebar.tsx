@@ -11,6 +11,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { AppText } from "@/components/primitives/AppText";
+import { ARCHIE_AURA_COLORS } from "@/components/onboarding/ArchieGradientBackground";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { MAX_SESSIONS } from "@/lib/archieSessionStorage";
 import { useAppStore } from "@/store/useAppStore";
@@ -19,6 +20,15 @@ import { fontFamily } from "@/theme/typography";
 import { radius, spacing } from "@/theme/spacing";
 
 const PANEL_WIDTH = 300;
+
+/** Soft accents derived from Archie page gradient — sidebar only. */
+const ARCHIE_SIDEBAR_ACCENT = {
+  activeBackground: "#F4ECFF",
+  activeBorder: "#C9A8FF",
+  badgeBackground: "#FCE8F5",
+  badgeBorder: "#F0A8D0",
+  badgeText: ARCHIE_AURA_COLORS.deepPurple
+} as const;
 
 function TrashIcon({ color }: { color: string }) {
   return (
@@ -60,18 +70,18 @@ export function ArchieChatSidebar() {
   const switchSession = useAppStore((state) => state.switchSession);
   const deleteSession = useAppStore((state) => state.deleteSession);
 
-  const translateX = useSharedValue(-PANEL_WIDTH);
+  const translateX = useSharedValue(PANEL_WIDTH);
 
   useEffect(() => {
     if (!visible) {
-      translateX.value = -PANEL_WIDTH;
+      translateX.value = PANEL_WIDTH;
       return;
     }
     translateX.value = withSpring(0, { damping: 24, stiffness: 240 });
   }, [translateX, visible]);
 
   function closePanel() {
-    translateX.value = withTiming(-PANEL_WIDTH, { duration: 160 }, () =>
+    translateX.value = withTiming(PANEL_WIDTH, { duration: 160 }, () =>
       runOnJS(closeArchieSidebar)()
     );
   }
@@ -142,8 +152,10 @@ export function ArchieChatSidebar() {
                     style={[
                       styles.row,
                       {
-                        borderColor: isActive ? colors.brandBorder : colors.border,
-                        backgroundColor: isActive ? colors.brandSoft : colors.canvas
+                        borderColor: isActive ? ARCHIE_SIDEBAR_ACCENT.activeBorder : colors.border,
+                        backgroundColor: isActive
+                          ? ARCHIE_SIDEBAR_ACCENT.activeBackground
+                          : colors.canvas
                       }
                     ]}
                   >
@@ -161,15 +173,21 @@ export function ArchieChatSidebar() {
                           style={[
                             styles.kindBadge,
                             {
-                              backgroundColor: isSwap ? colors.brandSoft : colors.surface,
-                              borderColor: isSwap ? colors.brandBorder : colors.borderLight
+                              backgroundColor: isSwap
+                                ? ARCHIE_SIDEBAR_ACCENT.badgeBackground
+                                : colors.surface,
+                              borderColor: isSwap
+                                ? ARCHIE_SIDEBAR_ACCENT.badgeBorder
+                                : colors.borderLight
                             }
                           ]}
                         >
                           <AppText
                             style={[
                               styles.kindText,
-                              { color: isSwap ? colors.brandOnBrand : colors.muted }
+                              {
+                                color: isSwap ? ARCHIE_SIDEBAR_ACCENT.badgeText : colors.muted
+                              }
                             ]}
                           >
                             {isSwap ? "Recipe swap" : "General"}
@@ -203,16 +221,17 @@ export function ArchieChatSidebar() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    flexDirection: "row"
+    flexDirection: "row",
+    justifyContent: "flex-end"
   },
   backdrop: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(17, 24, 39, 0.42)"
   },
   panel: {
-    borderRightWidth: 1,
-    borderTopRightRadius: radius.xl,
-    borderBottomRightRadius: radius.xl,
+    borderLeftWidth: 1,
+    borderTopLeftRadius: radius.xl,
+    borderBottomLeftRadius: radius.xl,
     height: "100%",
     paddingHorizontal: spacing.md,
     width: PANEL_WIDTH
