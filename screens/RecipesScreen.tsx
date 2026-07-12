@@ -1,9 +1,11 @@
 import * as Haptics from "expo-haptics";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import { AppText } from "@/components/primitives/AppText";
 import { floatingTabBarScrollInset } from "@/components/layout/BottomTabBar";
+import { CookbookSearchBar, type CookbookSortMode } from "@/components/recipe/CookbookSearchBar";
 import { DietMarker } from "@/components/recipe/DietMarker";
 import { SoupHeroIllustration } from "@/components/recipe/SoupHeroIllustration";
 import { COOKBOOK_ITEMS, type RecipeId } from "@/features/recipe/data/homemadeRecipe";
@@ -12,6 +14,21 @@ import { useAppStore } from "@/store/useAppStore";
 import { fontFamily } from "@/theme/typography";
 import { layout, radius, spacing } from "@/theme/spacing";
 import { RecipeScreen } from "@/screens/RecipeScreen";
+
+const CHEF_RECOMMENDED_ORDER = new Map(COOKBOOK_ITEMS.map((item, index) => [item.id, index]));
+
+function sortCookbookItems<T extends (typeof COOKBOOK_ITEMS)[number]>(items: readonly T[], mode: CookbookSortMode) {
+  const list = [...items];
+  if (mode === "a-z") {
+    return list.sort((a, b) => a.title.localeCompare(b.title));
+  }
+  if (mode === "z-a") {
+    return list.sort((a, b) => b.title.localeCompare(a.title));
+  }
+  return list.sort(
+    (a, b) => (CHEF_RECOMMENDED_ORDER.get(a.id) ?? 0) - (CHEF_RECOMMENDED_ORDER.get(b.id) ?? 0)
+  );
+}
 
 export function RecipesScreen() {
   const recipesView = useAppStore((state) => state.recipesView);
@@ -27,6 +44,16 @@ function RecipeListView() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const openRecipe = useAppStore((state) => state.openRecipe);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortMode, setSortMode] = useState<CookbookSortMode>("chef-recommended");
+
+  const visibleItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const filtered = query
+      ? COOKBOOK_ITEMS.filter((item) => item.title.toLowerCase().includes(query))
+      : COOKBOOK_ITEMS;
+    return sortCookbookItems(filtered, sortMode);
+  }, [searchQuery, sortMode]);
 
   async function handleOpen(recipeId: RecipeId) {
     await Haptics.selectionAsync();
@@ -38,12 +65,21 @@ function RecipeListView() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={[styles.content, { paddingBottom: floatingTabBarScrollInset(insets.bottom) }]}
       style={{ backgroundColor: colors.background }}
+      keyboardShouldPersistTaps="handled"
     >
       <AppText variant="title" style={styles.pageTitle}>
         Recipes
       </AppText>
+
+      <CookbookSearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        sortMode={sortMode}
+        onSortChange={setSortMode}
+      />
+
       <View style={styles.list}>
-        {COOKBOOK_ITEMS.map((item) => (
+        {visibleItems.map((item) => (
           <Pressable
             key={item.id}
             accessibilityRole="button"
@@ -104,7 +140,8 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 18,
     letterSpacing: -0.36,
-    lineHeight: 22
+    lineHeight: 22,
+    marginBottom: -4
   },
   list: {
     gap: spacing.md
