@@ -1,5 +1,6 @@
+import * as Haptics from "expo-haptics";
 import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { floatingTabBarScrollInset } from "@/components/layout/BottomTabBar";
@@ -12,6 +13,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { fontFamily } from "@/theme/typography";
 import { layout, spacing } from "@/theme/spacing";
 
+const HOME_RECIPE_LIMIT = 3;
 const CHEF_RECOMMENDED_ORDER = new Map(COOKBOOK_ITEMS.map((item, index) => [item.id, index]));
 
 function sortCookbookItems<T extends (typeof COOKBOOK_ITEMS)[number]>(items: readonly T[], mode: CookbookSortMode) {
@@ -39,6 +41,7 @@ export function HomeScreen() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const openRecipe = useAppStore((state) => state.openRecipe);
+  const setActiveTab = useAppStore((state) => state.setActiveTab);
   const cookingFor = useAppStore((state) => state.cookingFor);
   const [reasonSheetVisible, setReasonSheetVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,7 +52,7 @@ export function HomeScreen() {
     const filtered = query
       ? COOKBOOK_ITEMS.filter((item) => item.title.toLowerCase().includes(query))
       : COOKBOOK_ITEMS;
-    return sortCookbookItems(filtered, sortMode);
+    return sortCookbookItems(filtered, sortMode).slice(0, HOME_RECIPE_LIMIT);
   }, [searchQuery, sortMode]);
 
   const reasons = [
@@ -57,6 +60,11 @@ export function HomeScreen() {
     audienceReason(cookingFor),
     "Easy weeknight dinner"
   ];
+
+  async function handleSeeMore() {
+    await Haptics.selectionAsync();
+    setActiveTab("recipes");
+  }
 
   return (
     <>
@@ -91,6 +99,17 @@ export function HomeScreen() {
             />
           ))}
         </View>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="See more recipes"
+          accessibilityHint="Opens the Recipes tab"
+          hitSlop={8}
+          onPress={handleSeeMore}
+          style={styles.seeMoreRow}
+        >
+          <AppText style={[styles.seeMoreLabel, { color: colors.text }]}>See more</AppText>
+        </Pressable>
       </ScrollView>
 
       <BottomSheet
@@ -131,6 +150,19 @@ const styles = StyleSheet.create({
   },
   cards: {
     gap: spacing.lg
+  },
+  seeMoreRow: {
+    alignItems: "flex-end",
+    justifyContent: "center",
+    minHeight: 44,
+    paddingVertical: spacing.sm
+  },
+  seeMoreLabel: {
+    fontFamily,
+    fontSize: 15,
+    fontWeight: "600",
+    letterSpacing: -0.2,
+    textDecorationLine: "underline"
   },
   sheetReasons: {
     gap: spacing.sm
