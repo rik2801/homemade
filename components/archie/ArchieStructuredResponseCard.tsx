@@ -81,7 +81,7 @@ function ResponseSection({ label, value }: { label: string; value: string }) {
         {paragraphs.map((paragraph, index) => (
           <AppText
             key={`${label}-${index}`}
-            style={[styles.sectionValue, { color: colors.muted }, index > 0 ? styles.sectionParagraphGap : null]}
+            style={[styles.sectionValue, { color: colors.text }, index > 0 ? styles.sectionParagraphGap : null]}
           >
             {paragraph.trim()}
           </AppText>

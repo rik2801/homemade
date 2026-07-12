@@ -3,24 +3,38 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { AppText } from "@/components/primitives/AppText";
 import { CookingBowlIllustration } from "@/components/profile/ProfileIcons";
 import { PROFILE_COLORS } from "@/components/profile/profileColors";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import { fontFamily } from "@/theme/typography";
 
 export function ProfileSummaryCard() {
+  const { colors, isDark } = useAppTheme();
+  const gradientStart = isDark ? colors.brandOliveSoft : PROFILE_COLORS.summaryStart;
+  const gradientEnd = isDark ? "#2A3318" : PROFILE_COLORS.summaryEnd;
+  const titleColor = isDark ? colors.text : PROFILE_COLORS.primaryText;
+  const subtitleColor = isDark ? colors.muted : PROFILE_COLORS.summarySubtitle;
+
   return (
-    <View style={styles.summaryCard}>
+    <View
+      style={[
+        styles.summaryCard,
+        { backgroundColor: isDark ? colors.brandOliveSoft : PROFILE_COLORS.summarySolid }
+      ]}
+    >
       <Svg pointerEvents="none" style={StyleSheet.absoluteFill}>
         <Defs>
           <LinearGradient id="profileSummaryGrad" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor={PROFILE_COLORS.summaryStart} />
-            <Stop offset="1" stopColor={PROFILE_COLORS.summaryEnd} />
+            <Stop offset="0" stopColor={gradientStart} />
+            <Stop offset="1" stopColor={gradientEnd} />
           </LinearGradient>
         </Defs>
         <Rect width="100%" height="100%" fill="url(#profileSummaryGrad)" />
       </Svg>
 
       <View style={styles.summaryText}>
-        <AppText style={styles.summaryTitle}>Your cooking profile</AppText>
-        <AppText style={styles.summarySubtitle}>Personalized for better answers</AppText>
+        <AppText style={[styles.summaryTitle, { color: titleColor }]}>Your cooking profile</AppText>
+        <AppText style={[styles.summarySubtitle, { color: subtitleColor }]}>
+          Personalized for better answers
+        </AppText>
       </View>
 
       <View style={styles.summaryIllustration} importantForAccessibility="no">
@@ -39,8 +53,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    overflow: "hidden",
-    backgroundColor: PROFILE_COLORS.summarySolid
+    overflow: "hidden"
   },
   summaryText: {
     flex: 1,
@@ -51,15 +64,13 @@ const styles = StyleSheet.create({
     fontFamily,
     fontSize: 13,
     fontWeight: "400",
-    letterSpacing: -0.2,
-    color: PROFILE_COLORS.primaryText
+    letterSpacing: -0.2
   },
   summarySubtitle: {
     marginTop: 4,
     fontFamily,
     fontSize: 10,
-    lineHeight: 14,
-    color: PROFILE_COLORS.summarySubtitle
+    lineHeight: 14
   },
   summaryIllustration: {
     width: 72,

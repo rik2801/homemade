@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ClipboardListIcon,
   LeafIcon,
+  MoonIcon,
   ShieldAlertIcon,
   UsersIcon
 } from "@/components/profile/ProfileIcons";
@@ -23,6 +24,8 @@ export function ProfileScreen() {
   const dietaryGoals = useAppStore((state) => state.dietaryGoals);
   const allergies = useAppStore((state) => state.allergies);
   const pantryMode = useAppStore((state) => state.pantryMode);
+  const darkMode = useAppStore((state) => state.darkMode);
+  const setDarkMode = useAppStore((state) => state.setDarkMode);
   const openProfileSheet = useAppStore((state) => state.openProfileSheet);
 
   const pageBackground = isDark ? colors.background : PROFILE_COLORS.pageBackground;
@@ -33,6 +36,11 @@ export function ProfileScreen() {
   async function openSheet(mode: "cookingFor" | "dietaryGoals" | "allergies" | "pantryMode") {
     await Haptics.selectionAsync();
     openProfileSheet(mode);
+  }
+
+  async function handleDarkModeChange(next: boolean) {
+    await Haptics.selectionAsync();
+    setDarkMode(next);
   }
 
   return (
@@ -93,6 +101,16 @@ export function ProfileScreen() {
           trailing="chevron"
           accessibilityHint="Opens pantry behavior settings"
           onPress={() => openSheet("pantryMode")}
+        />
+        <ProfileSeparator />
+        <ProfileSettingRow
+          icon={<MoonIcon color={PROFILE_COLORS.technicalIcon} />}
+          iconBackgroundColor={PROFILE_COLORS.technicalBackground}
+          label="Appearance"
+          value="Dark mode"
+          trailing="switch"
+          switchValue={darkMode}
+          onSwitchChange={handleDarkModeChange}
         />
       </View>
     </ScrollView>

@@ -45,7 +45,8 @@ export default function AppShell() {
     <View style={[styles.root, activeTab === "archie" ? styles.rootArchie : { backgroundColor: shellBackground }]}>
       {activeTab === "archie" ? (
         <ArchieGradientBackground
-          gradientOpacity={conversationStarted ? 0.01 : 1}
+          gradientOpacity={conversationStarted ? (isDark ? 0.28 : 0.01) : 1}
+          underlayColor={isDark ? "#000000" : undefined}
           style={styles.archieShell}
         >
           <BrandHeader />

@@ -158,7 +158,10 @@ function PreferenceOption({
   selected: boolean;
   onPress: () => void;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
+  const selectedText = isDark ? "#FFFFFF" : colors.brandOnBrand;
+  const selectedBackground = isDark ? "#3D3418" : colors.brandSoft;
+  const selectedBorder = isDark ? colors.brand : colors.brandBorder;
 
   async function handlePress() {
     await Haptics.selectionAsync();
@@ -173,11 +176,11 @@ function PreferenceOption({
       style={[
         styles.option,
         selected
-          ? { backgroundColor: colors.brandSoft, borderColor: colors.brandBorder }
+          ? { backgroundColor: selectedBackground, borderColor: selectedBorder }
           : { backgroundColor: colors.surface, borderColor: colors.border }
       ]}
     >
-      <AppText style={[styles.optionText, { color: selected ? colors.brandOnBrand : colors.text }]}>
+      <AppText style={[styles.optionText, { color: selected ? selectedText : colors.text }]}>
         {label}
       </AppText>
     </Pressable>

@@ -20,7 +20,6 @@ const INDICATOR_TOP = 8;
 const CAP_CENTER = TAB_ISLAND_HEIGHT / 2;
 const TAB_COUNT = 4;
 const ACTIVE_INDICATOR_COLOR = "#FFDB58";
-const ISLAND_BACKGROUND = "#FFFFFF";
 const TAB_BAR_LOW_OFFSET_SCALE = 0.15;
 const TAB_BAR_LIFT_RATIO = 0.3 / 3;
 const ISLAND_BOTTOM_GAP = Math.round(spacing.sm * 1.3);
@@ -83,7 +82,15 @@ function tabIconTint(active: boolean, brandOnBrand: string, text: string) {
   return active ? brandOnBrand : text;
 }
 
-function TabIcon({ type, color }: { type: TabIconType; color: string }) {
+function TabIcon({
+  type,
+  color,
+  outlined
+}: {
+  type: TabIconType;
+  color: string;
+  outlined?: boolean;
+}) {
   if (type === "home") {
     return (
       <Svg width={HOME_ICON_SIZE} height={HOME_ICON_SIZE} viewBox="0 0 24 24" fill="none">
@@ -109,7 +116,7 @@ function TabIcon({ type, color }: { type: TabIconType; color: string }) {
   }
 
   if (type === "archie") {
-    return <ArchieMascotAvatar size={TAB_MASCOT_SIZE} />;
+    return <ArchieMascotAvatar size={TAB_MASCOT_SIZE} outlined={outlined} />;
   }
 
   return (
@@ -123,7 +130,7 @@ function TabIcon({ type, color }: { type: TabIconType; color: string }) {
 export function BottomTabBar() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
-  const { colors, scheme } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const activeTab = useAppStore((state) => state.activeTab);
   const returnTab = useAppStore((state) => state.returnTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
@@ -134,6 +141,8 @@ export function BottomTabBar() {
   const markerIndex =
     activeTab === "archie" ? Math.max(0, tabs.findIndex((tab) => tab.key === returnTab)) : activeIndex;
   const indicatorLeft = useSharedValue(indicatorLeftForIndex(markerIndex, tabWidth, islandWidth));
+  const islandBackground = isDark ? colors.surface : "#FFFFFF";
+  const inactiveIconColor = colors.text;
 
   useEffect(() => {
     if (activeTab === "archie") return;
@@ -177,19 +186,19 @@ export function BottomTabBar() {
           style={[
             styles.islandShadow,
             {
-              shadowColor: scheme === "dark" ? "#000000" : "#111827",
+              shadowColor: isDark ? "#000000" : "#111827",
               width: islandWidth
             }
           ]}
         >
-          <View style={[styles.island, { width: islandWidth }]}>
+          <View style={[styles.island, { backgroundColor: islandBackground, width: islandWidth }]}>
             <Animated.View
               pointerEvents="none"
               style={[styles.activeIndicator, indicatorStyle, styles.activeIndicatorDefault]}
             />
             {tabs.map((tab, index) => {
               const active = activeTab === tab.key;
-              const tint = tabIconTint(active, colors.brandOnBrand, colors.text);
+              const tint = tabIconTint(active, colors.brandOnBrand, inactiveIconColor);
               const slotLeft = tabSlotLeft(index, tabWidth, islandWidth);
 
               return (
@@ -209,7 +218,7 @@ export function BottomTabBar() {
                     }
                   ]}
                 >
-                  <TabIcon type={tab.icon} color={tint} />
+                  <TabIcon type={tab.icon} color={tint} outlined={isDark && tab.icon === "archie"} />
                 </Pressable>
               );
             })}
@@ -243,7 +252,6 @@ const styles = StyleSheet.create({
     shadowRadius: 20
   },
   island: {
-    backgroundColor: ISLAND_BACKGROUND,
     borderRadius: 999,
     height: TAB_ISLAND_HEIGHT,
     overflow: "hidden",

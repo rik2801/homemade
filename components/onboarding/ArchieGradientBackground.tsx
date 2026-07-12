@@ -16,6 +16,8 @@ type ArchieGradientBackgroundProps = {
   style?: StyleProp<ViewStyle>;
   /** Full-strength by default; pass a lower value once conversation starts. */
   gradientOpacity?: number;
+  /** Base color beneath the gradient canvas. */
+  underlayColor?: string;
 };
 
 /** Homemade aura palette used for the Meet Archie gradient. */
@@ -31,15 +33,17 @@ export const ARCHIE_AURA_COLORS = {
 } as const;
 
 const GRADIENT_FADE_MS = 360;
-const BASE_UNDERLAY = "#FFF7FB";
+const BASE_UNDERLAY_LIGHT = "#FFF7FB";
 
 export function ArchieGradientBackground({
   children,
   style,
-  gradientOpacity = 1
+  gradientOpacity = 1,
+  underlayColor
 }: ArchieGradientBackgroundProps) {
   const { width, height } = useWindowDimensions();
   const opacity = useSharedValue(gradientOpacity);
+  const baseColor = underlayColor ?? BASE_UNDERLAY_LIGHT;
 
   useEffect(() => {
     opacity.value = withTiming(gradientOpacity, { duration: GRADIENT_FADE_MS });
@@ -50,7 +54,7 @@ export function ArchieGradientBackground({
   }));
 
   return (
-    <View style={[styles.root, { backgroundColor: BASE_UNDERLAY }, style]}>
+    <View style={[styles.root, { backgroundColor: baseColor }, style]}>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, canvasStyle]}>
         <Canvas style={StyleSheet.absoluteFill}>
           <Fill>

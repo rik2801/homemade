@@ -115,6 +115,7 @@ type AppState = {
   pantryMode: PantryMode;
   profileSheetMode: ProfileSheetMode;
   profileSheetVisible: boolean;
+  darkMode: boolean;
   setActiveTab: (tab: TabName) => void;
   exitArchie: () => void;
   openRecipe: (recipeId: string, options?: { showDetail?: boolean }) => void;
@@ -167,6 +168,8 @@ type AppState = {
   setPantryMode: (mode: PantryMode) => void;
   openProfileSheet: (mode: Exclude<ProfileSheetMode, null>) => void;
   closeProfileSheet: () => void;
+  setDarkMode: (enabled: boolean) => void;
+  toggleDarkMode: () => void;
 };
 
 function substitutionsForRecipe(applied: AppliedSubstitutionsMap, recipeId: string) {
@@ -370,6 +373,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   pantryMode: DEFAULT_PREFERENCES.pantryMode,
   profileSheetMode: null,
   profileSheetVisible: false,
+  darkMode: false,
 
   setActiveTab: (tab) => {
     const current = get().activeTab;
@@ -1331,7 +1335,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   openProfileSheet: (mode) => set({ profileSheetMode: mode, profileSheetVisible: true }),
 
-  closeProfileSheet: () => set({ profileSheetMode: null, profileSheetVisible: false })
+  closeProfileSheet: () => set({ profileSheetMode: null, profileSheetVisible: false }),
+
+  setDarkMode: (enabled) => set({ darkMode: enabled }),
+
+  toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode }))
 }));
 
 export const useRecipeStore = useAppStore;

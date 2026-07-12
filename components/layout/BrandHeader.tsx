@@ -44,6 +44,10 @@ export function BrandHeader() {
   const isArchie = activeTab === "archie";
   const isProfile = activeTab === "profile";
   const isPreferenceEdit = isProfile && profileSheetVisible;
+  const chatMessages = useAppStore((state) => state.chatMessages);
+  const archieConversationStarted = chatMessages.length > 0;
+  const archieIconColor =
+    archieConversationStarted && isDark ? "#FFFFFF" : "#111827";
   const headerBackground = isArchie
     ? "transparent"
     : (isProfile || isPreferenceEdit) && !isDark
@@ -89,7 +93,7 @@ export function BrandHeader() {
             onPress={handleBack}
             style={styles.sideButton}
           >
-            <ChevronLeft color={colors.text} />
+            <ChevronLeft color={archieIconColor} />
           </Pressable>
           <View pointerEvents="none" style={styles.logoOverlay}>
             <ArchieLogo align="center" />
@@ -101,7 +105,7 @@ export function BrandHeader() {
             onPress={handleOpenChats}
             style={styles.sideButton}
           >
-            <ChatHistoryIcon color={colors.text} />
+            <ChatHistoryIcon color={archieIconColor} />
           </Pressable>
         </View>
       ) : isPreferenceEdit ? (

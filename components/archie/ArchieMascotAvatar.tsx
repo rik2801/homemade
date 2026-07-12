@@ -123,15 +123,19 @@ function startIdleLookLoop(
 
 type ArchieMascotAvatarProps = {
   size?: number;
+  /** Soft white silhouette outline — used on dark tab bars. */
+  outlined?: boolean;
 };
 
-export function ArchieMascotAvatar({ size = MASCOT_SIZE }: ArchieMascotAvatarProps) {
+export function ArchieMascotAvatar({ size = MASCOT_SIZE, outlined = false }: ArchieMascotAvatarProps) {
   const archieComposerDraft = useAppStore((state) => state.archieComposerDraft);
   const isLookingDown = archieComposerDraft.length > 0;
   const metrics = useMemo(() => getMascotMetrics(size), [size]);
   const blinkScale = useSharedValue(1);
   const lookX = useSharedValue(0);
   const lookY = useSharedValue(0);
+  const outlineSize = size * 1.16;
+  const outlineOffset = (size - outlineSize) / 2;
 
   useEffect(() => {
     blinkScale.value = withRepeat(
@@ -174,6 +178,20 @@ export function ArchieMascotAvatar({ size = MASCOT_SIZE }: ArchieMascotAvatarPro
         width: size
       }}
     >
+      {outlined ? (
+        <Image
+          resizeMode="contain"
+          source={ARCHIE_MASCOT_IMAGE}
+          style={{
+            height: outlineSize,
+            left: outlineOffset,
+            position: "absolute",
+            tintColor: "#FFFFFF",
+            top: outlineOffset,
+            width: outlineSize
+          }}
+        />
+      ) : null}
       <Image resizeMode="contain" source={ARCHIE_MASCOT_IMAGE} style={{ height: size, width: size }} />
       <View pointerEvents="none" style={styles.eyesLayer}>
         <Animated.View

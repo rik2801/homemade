@@ -83,6 +83,14 @@ export function SettingsGearIcon({ color, size = 22 }: IconProps) {
   );
 }
 
+export function MoonIcon({ color, size = 21 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+    </Svg>
+  );
+}
+
 export function CookingBowlIllustration({ size = 72 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 72 72" fill="none">

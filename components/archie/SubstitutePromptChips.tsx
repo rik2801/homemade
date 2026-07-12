@@ -109,7 +109,7 @@ export function SubstitutePromptChips() {
           onPress={() => handlePress(chip.value)}
           style={[styles.chip, { borderColor: colors.brandBorder, backgroundColor: colors.surface }]}
         >
-          <AppText style={[styles.chipText, { color: colors.brandOnBrand }]}>{chip.label}</AppText>
+          <AppText style={[styles.chipText, { color: colors.text }]}>{chip.label}</AppText>
         </Pressable>
       ))}
     </View>

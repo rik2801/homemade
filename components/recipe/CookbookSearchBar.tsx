@@ -23,12 +23,19 @@ type CookbookSearchBarProps = {
 };
 
 export function CookbookSearchBar({ value, onChangeText, sortMode, onSortChange }: CookbookSearchBarProps) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const { width: windowWidth } = useWindowDimensions();
   const sortButtonRef = useRef<View>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuTop, setMenuTop] = useState(0);
   const [menuRight, setMenuRight] = useState<number>(layout.screenPadding);
+
+  const fieldBackground = isDark ? "#2A2A2A" : colors.canvas;
+  const iconBackground = isDark ? "#3A3A3A" : colors.surface;
+  const fieldBorder = isDark ? "rgba(255,255,255,0.22)" : "transparent";
+  const placeholderColor = isDark ? "#A1A1AA" : colors.faint;
+  const iconColor = isDark ? "#FFFFFF" : colors.text;
+  const selectedMenuText = isDark ? "#FFFFFF" : colors.brandOnBrand;
 
   function openMenu() {
     sortButtonRef.current?.measureInWindow((x, y, buttonWidth, buttonHeight) => {
@@ -51,7 +58,16 @@ export function CookbookSearchBar({ value, onChangeText, sortMode, onSortChange 
   return (
     <>
       <View style={styles.row}>
-        <View style={[styles.searchBar, { backgroundColor: colors.canvas }]}>
+        <View
+          style={[
+            styles.searchBar,
+            {
+              backgroundColor: fieldBackground,
+              borderColor: fieldBorder,
+              borderWidth: isDark ? 1 : 0
+            }
+          ]}
+        >
           <TextInput
             accessibilityLabel="Search recipes"
             autoCapitalize="none"
@@ -59,13 +75,13 @@ export function CookbookSearchBar({ value, onChangeText, sortMode, onSortChange 
             clearButtonMode="while-editing"
             onChangeText={onChangeText}
             placeholder="Search recipes"
-            placeholderTextColor={colors.faint}
+            placeholderTextColor={placeholderColor}
             returnKeyType="search"
             style={[styles.input, { color: colors.text }]}
             value={value}
           />
-          <View style={[styles.searchIconWrap, { backgroundColor: colors.surface }]}>
-            <SearchIcon color={colors.text} />
+          <View style={[styles.searchIconWrap, { backgroundColor: iconBackground }]}>
+            <SearchIcon color={iconColor} />
           </View>
         </View>
         <View ref={sortButtonRef} collapsable={false}>
@@ -77,11 +93,21 @@ export function CookbookSearchBar({ value, onChangeText, sortMode, onSortChange 
             onPress={menuOpen ? closeMenu : openMenu}
             style={[
               styles.sortBtn,
-              { backgroundColor: colors.canvas },
-              menuOpen ? { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 } : null
+              {
+                backgroundColor: fieldBackground,
+                borderColor: fieldBorder,
+                borderWidth: isDark ? 1 : 0
+              },
+              menuOpen
+                ? {
+                    backgroundColor: iconBackground,
+                    borderColor: isDark ? "rgba(255,255,255,0.35)" : colors.border,
+                    borderWidth: 1
+                  }
+                : null
             ]}
           >
-            <SortIcon color={colors.text} />
+            <SortIcon color={iconColor} />
           </Pressable>
         </View>
       </View>
@@ -101,13 +127,15 @@ export function CookbookSearchBar({ value, onChangeText, sortMode, onSortChange 
               style={[
                 styles.menuItem,
                 index < SORT_OPTIONS.length - 1 ? { borderBottomColor: colors.borderLight, borderBottomWidth: 1 } : null,
-                sortMode === option.id ? { backgroundColor: colors.brandSoft } : null
+                sortMode === option.id
+                  ? { backgroundColor: isDark ? "#3D3418" : colors.brandSoft }
+                  : null
               ]}
             >
               <AppText
                 style={[
                   styles.menuItemText,
-                  { color: sortMode === option.id ? colors.brandOnBrand : colors.text },
+                  { color: sortMode === option.id ? selectedMenuText : colors.text },
                   sortMode === option.id ? styles.menuItemTextSelected : null
                 ]}
               >

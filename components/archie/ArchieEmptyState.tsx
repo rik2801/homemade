@@ -53,6 +53,7 @@ const styles = StyleSheet.create({
     width: "100%"
   },
   headline: {
+    color: "#111827",
     fontFamily,
     fontSize: 15,
     fontWeight: "400",

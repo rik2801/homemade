@@ -22,7 +22,7 @@ type RecipeScreenProps = {
 const EMPTY_SUBSTITUTIONS: Record<string, SubstitutionRecord> = {};
 
 export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const recipe = useAppStore((state) => state.recipe);
@@ -36,6 +36,10 @@ export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
   const assistantContext = useAppStore((state) => state.assistantContext);
   const justAppliedId = useAppStore((state) => state.justAppliedId);
   const assistantPhase = useAppStore((state) => state.assistantPhase);
+  const chipTextColor = isDark ? "#FFFFFF" : colors.brandOnBrand;
+  const chipBackground = isDark ? "#3D3418" : colors.brandSoft;
+  const chipBorder = isDark ? colors.brand : colors.brandBorder;
+  const accentOnSurface = isDark ? colors.brand : colors.brandOnBrand;
 
   useEffect(() => {
     if (justAppliedId) {
@@ -85,8 +89,11 @@ export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
         </AppText>
         <View style={styles.chips}>
           {recipe.dietaryBadges.map((badge) => (
-            <View key={badge} style={[styles.chip, { borderColor: colors.brandBorder, backgroundColor: colors.brandSoft }]}>
-              <AppText style={[styles.chipText, { color: colors.brandOnBrand }]}>{badge}</AppText>
+            <View
+              key={badge}
+              style={[styles.chip, { borderColor: chipBorder, backgroundColor: chipBackground }]}
+            >
+              <AppText style={[styles.chipText, { color: chipTextColor }]}>{badge}</AppText>
             </View>
           ))}
         </View>
@@ -94,7 +101,15 @@ export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
 
       <View style={[styles.photoCard, { borderColor: colors.border }]}>
         <SoupHeroIllustration recipeId={recipe.id as RecipeId} />
-        <View style={[styles.macros, { borderTopColor: colors.border }]}>
+        <View
+          style={[
+            styles.macros,
+            {
+              borderTopColor: colors.border,
+              backgroundColor: isDark ? colors.surface : "#FFFFFF"
+            }
+          ]}
+        >
           <MacroItem label="Servings" value={String(recipe.servings)} isLast={false} />
           {recipe.nutrition.macros.map((macro, index) => (
             <MacroItem
@@ -115,15 +130,15 @@ export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
               accessibilityRole="button"
               accessibilityLabel="Swap an ingredient"
               onPress={handleSwapPress}
-              style={[styles.swapBtn, { borderColor: colors.brandBorder, backgroundColor: colors.surface }]}
+              style={[styles.swapBtn, { borderColor: chipBorder, backgroundColor: colors.surface }]}
             >
-              <Svg width={10} height={10} viewBox="0 0 24 24" stroke={colors.brandOnBrand} fill="none" strokeWidth={2}>
+              <Svg width={10} height={10} viewBox="0 0 24 24" stroke={accentOnSurface} fill="none" strokeWidth={2}>
                 <Path d="M16 3h5v5" />
                 <Path d="M4 20 21 3" />
                 <Path d="M21 16v5h-5" />
                 <Path d="M15 15 3 3" />
               </Svg>
-              <AppText style={[styles.swapLabel, { color: colors.brandOnBrand }]}>Swap</AppText>
+              <AppText style={[styles.swapLabel, { color: accentOnSurface }]}>Swap</AppText>
             </Pressable>
           ) : (
             <View style={styles.sectionSpacer} />
@@ -206,7 +221,7 @@ export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
                 ]}
               >
                 <AppText style={[styles.stepNum, { color: colors.faint }]}>{index + 1}</AppText>
-                <AppText style={[styles.stepText, { color: colors.muted }]}>{step}</AppText>
+                <AppText style={[styles.stepText, { color: isDark ? "#FFFFFF" : colors.muted }]}>{step}</AppText>
               </View>
             );
           })}
@@ -220,7 +235,7 @@ function MacroItem({ label, value, isLast }: { label: string; value: string; isL
   const { colors } = useAppTheme();
   return (
     <View style={[styles.macro, !isLast ? { borderRightColor: colors.borderLight, borderRightWidth: StyleSheet.hairlineWidth } : null]}>
-      <AppText style={styles.macroVal}>{value}</AppText>
+      <AppText style={[styles.macroVal, { color: colors.text }]}>{value}</AppText>
       <AppText style={[styles.macroLbl, { color: colors.faint }]}>{label.toUpperCase()}</AppText>
     </View>
   );
@@ -274,7 +289,6 @@ const styles = StyleSheet.create({
     overflow: "hidden"
   },
   macros: {
-    backgroundColor: "#FFFFFF",
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     paddingBottom: 11,
@@ -288,7 +302,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4
   },
   macroVal: {
-    color: "#111827",
     fontFamily,
     fontSize: 14,
     fontWeight: "400",

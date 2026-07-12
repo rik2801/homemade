@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Switch, View } from "react-native";
 import { AppText } from "@/components/primitives/AppText";
 import { ChevronRightIcon } from "@/components/profile/ProfileIcons";
 import { PROFILE_COLORS } from "@/components/profile/profileColors";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import { fontFamily } from "@/theme/typography";
 
 const MAX_VISIBLE_CHIPS = 3;
@@ -22,12 +23,26 @@ export type ProfileSettingRowProps = {
 };
 
 export function ProfileSeparator() {
-  return <View style={styles.separator} />;
+  const { colors, isDark } = useAppTheme();
+  return (
+    <View
+      style={[
+        styles.separator,
+        { backgroundColor: isDark ? colors.border : PROFILE_COLORS.separator }
+      ]}
+    />
+  );
 }
 
 export function ProfileValueChips({ values }: { values: string[] }) {
+  const { colors, isDark } = useAppTheme();
+
   if (values.length === 0) {
-    return <AppText style={styles.rowValue}>None selected</AppText>;
+    return (
+      <AppText style={[styles.rowValue, { color: isDark ? colors.text : PROFILE_COLORS.primaryText }]}>
+        None selected
+      </AppText>
+    );
   }
 
   const visible = values.slice(0, MAX_VISIBLE_CHIPS);
@@ -36,13 +51,42 @@ export function ProfileValueChips({ values }: { values: string[] }) {
   return (
     <View style={styles.chipRow}>
       {visible.map((value) => (
-        <View key={value} style={styles.goalChip}>
-          <AppText style={styles.goalChipText}>{value}</AppText>
+        <View
+          key={value}
+          style={[
+            styles.goalChip,
+            isDark
+              ? { backgroundColor: "#3D3418", borderColor: colors.brand }
+              : null
+          ]}
+        >
+          <AppText
+            style={[
+              styles.goalChipText,
+              { color: isDark ? "#FFFFFF" : PROFILE_COLORS.chipText }
+            ]}
+          >
+            {value}
+          </AppText>
         </View>
       ))}
       {overflow > 0 ? (
-        <View style={styles.goalChip}>
-          <AppText style={styles.goalChipText}>{`+${overflow}`}</AppText>
+        <View
+          style={[
+            styles.goalChip,
+            isDark
+              ? { backgroundColor: "#3D3418", borderColor: colors.brand }
+              : null
+          ]}
+        >
+          <AppText
+            style={[
+              styles.goalChipText,
+              { color: isDark ? "#FFFFFF" : PROFILE_COLORS.chipText }
+            ]}
+          >
+            {`+${overflow}`}
+          </AppText>
         </View>
       ) : null}
     </View>
@@ -62,12 +106,16 @@ export function ProfileSettingRow({
   disabled,
   accessibilityHint
 }: ProfileSettingRowProps) {
+  const { colors, isDark } = useAppTheme();
   const isSwitch = trailing === "switch";
   const accessibleValue = chips
     ? chips.length > 0
       ? chips.join(", ")
       : "None selected"
     : value ?? (isSwitch ? (switchValue ? "On" : "Off") : undefined);
+  const labelColor = isDark ? colors.muted : PROFILE_COLORS.secondaryText;
+  const valueColor = isDark ? colors.text : PROFILE_COLORS.primaryText;
+  const chevronColor = isDark ? colors.faint : PROFILE_COLORS.tertiaryText;
 
   return (
     <Pressable
@@ -83,7 +131,9 @@ export function ProfileSettingRow({
       }
       style={({ pressed }) => [
         styles.profileRow,
-        pressed && (onPress || isSwitch) && styles.profileRowPressed
+        pressed && (onPress || isSwitch)
+          ? { backgroundColor: isDark ? colors.canvas : PROFILE_COLORS.rowPressed }
+          : null
       ]}
     >
       <View style={[styles.iconCircle, { backgroundColor: iconBackgroundColor }]} importantForAccessibility="no">
@@ -91,18 +141,18 @@ export function ProfileSettingRow({
       </View>
 
       <View style={styles.rowContent}>
-        <AppText style={styles.rowLabel}>{label}</AppText>
+        <AppText style={[styles.rowLabel, { color: labelColor }]}>{label}</AppText>
         {chips ? (
           <ProfileValueChips values={chips} />
         ) : value ? (
-          <AppText style={styles.rowValue} numberOfLines={2}>
+          <AppText style={[styles.rowValue, { color: valueColor }]} numberOfLines={2}>
             {value}
           </AppText>
         ) : null}
       </View>
 
       <View style={styles.trailing} pointerEvents={isSwitch ? "box-none" : "none"}>
-        {trailing === "chevron" ? <ChevronRightIcon color={PROFILE_COLORS.tertiaryText} /> : null}
+        {trailing === "chevron" ? <ChevronRightIcon color={chevronColor} /> : null}
         {trailing === "switch" ? (
           <Switch
             accessibilityElementsHidden
@@ -110,11 +160,11 @@ export function ProfileSettingRow({
             pointerEvents="none"
             value={switchValue}
             trackColor={{
-              false: PROFILE_COLORS.switchInactive,
+              false: isDark ? colors.border : PROFILE_COLORS.switchInactive,
               true: PROFILE_COLORS.switchActive
             }}
             thumbColor="#FFFFFF"
-            ios_backgroundColor={PROFILE_COLORS.switchInactive}
+            ios_backgroundColor={isDark ? colors.border : PROFILE_COLORS.switchInactive}
           />
         ) : null}
       </View>
@@ -129,9 +179,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     flexDirection: "row",
     alignItems: "center"
-  },
-  profileRowPressed: {
-    backgroundColor: PROFILE_COLORS.rowPressed
   },
   iconCircle: {
     width: 44,
@@ -150,8 +197,7 @@ const styles = StyleSheet.create({
     fontFamily,
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: "500",
-    color: PROFILE_COLORS.secondaryText
+    fontWeight: "500"
   },
   rowValue: {
     marginTop: 2,
@@ -159,8 +205,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "400",
-    letterSpacing: -0.15,
-    color: PROFILE_COLORS.primaryText
+    letterSpacing: -0.15
   },
   chipRow: {
     marginTop: 6,
@@ -181,8 +226,7 @@ const styles = StyleSheet.create({
     fontFamily,
     fontSize: 10,
     lineHeight: 13,
-    fontWeight: "400",
-    color: PROFILE_COLORS.chipText
+    fontWeight: "400"
   },
   trailing: {
     marginLeft: 8,
@@ -192,7 +236,6 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: PROFILE_COLORS.separator,
     marginLeft: 76
   }
 });
