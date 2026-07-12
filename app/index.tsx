@@ -25,6 +25,8 @@ export default function AppShell() {
   const insets = useSafeAreaInsets();
   const onboardingCompleted = useAppStore((state) => state.onboardingCompleted);
   const activeTab = useAppStore((state) => state.activeTab);
+  const chatMessages = useAppStore((state) => state.chatMessages);
+  const conversationStarted = chatMessages.length > 0;
   const archieComposerBottom = useMemo(
     () => archieComposerBottomOffset(Math.round(insets.bottom)),
     [insets.bottom]
@@ -37,7 +39,10 @@ export default function AppShell() {
   return (
     <View style={[styles.root, activeTab === "archie" ? styles.rootArchie : { backgroundColor: colors.background }]}>
       {activeTab === "archie" ? (
-        <ArchieGradientBackground style={styles.archieShell}>
+        <ArchieGradientBackground
+          gradientOpacity={conversationStarted ? 0.01 : 1}
+          style={styles.archieShell}
+        >
           <BrandHeader />
           <View style={styles.archieContent}>
             <ArchieScreen />
