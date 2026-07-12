@@ -81,26 +81,25 @@ export function CookbookRecipeCard({
         <ImageVignette gradientId={`card-vignette-${recipeId}`} />
         <View pointerEvents="none" style={styles.bottomOverlay}>
           <View style={styles.overlayContent}>
-            <View style={styles.titleRow}>
-              <View style={styles.titleWithMarker}>
-                <AppText variant="heading" style={[styles.recipeTitle, styles.overlayText]}>
-                  {title}
-                </AppText>
-                {!hasBadges ? <DietMarker dietType={dietType} /> : null}
+            <AppText
+              variant="heading"
+              numberOfLines={2}
+              style={[styles.recipeTitle, styles.overlayText]}
+            >
+              {title}
+            </AppText>
+            <View style={styles.secondLine}>
+              <View style={styles.metaRow}>
+                <DietMarker dietType={dietType} />
+                {hasBadges
+                  ? badges.map((badge) => <MetaPill key={badge} label={badge} />)
+                  : null}
               </View>
               <View style={styles.timeRow}>
                 <ClockIcon color="#FFFFFF" />
                 <AppText style={[styles.timeText, styles.overlayText]}>{timeLabel}</AppText>
               </View>
             </View>
-            {hasBadges ? (
-              <View style={styles.metaRow}>
-                <DietMarker dietType={dietType} />
-                {badges.map((badge) => (
-                  <MetaPill key={badge} label={badge} />
-                ))}
-              </View>
-            ) : null}
           </View>
         </View>
       </View>
@@ -130,7 +129,7 @@ function ImageVignette({ gradientId }: { gradientId: string }) {
 
 function ClockIcon({ color }: { color: string }) {
   return (
-    <Svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.75}>
+    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.2}>
       <Circle cx={12} cy={12} r={9} />
       <Path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
@@ -177,7 +176,7 @@ const styles = StyleSheet.create({
     right: 0
   },
   overlayContent: {
-    position: "relative"
+    gap: 10
   },
   recommendedBadge: {
     borderRadius: radius.pill,
@@ -214,43 +213,38 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 10
   },
-  titleRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.sm,
-    justifyContent: "space-between"
-  },
-  titleWithMarker: {
-    alignItems: "center",
-    flex: 1,
-    flexDirection: "row",
-    flexShrink: 1,
-    gap: 6
-  },
   recipeTitle: {
-    flexShrink: 1,
     fontSize: 16,
     lineHeight: 18
   },
   overlayText: {
     color: "#FFFFFF"
   },
+  secondLine: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "space-between"
+  },
   timeRow: {
     alignItems: "center",
     flexDirection: "row",
+    flexShrink: 0,
     gap: 4
   },
   timeText: {
     fontFamily,
-    fontSize: 10,
-    lineHeight: 14
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 16
   },
   metaRow: {
     alignItems: "center",
+    flex: 1,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
-    marginTop: 10
+    minWidth: 0
   },
   pill: {
     alignSelf: "flex-start",
