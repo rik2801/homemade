@@ -10,6 +10,7 @@ import { ComposerAttachmentSheets } from "@/components/archie/ComposerAttachment
 import { ArchieGradientBackground } from "@/components/onboarding/ArchieGradientBackground";
 import { ArchitecturePrivacySheet } from "@/components/more/ArchitecturePrivacySheet";
 import { PROFILE_COLORS } from "@/components/profile/profileColors";
+import { RECIPE_DETAILS_COLORS } from "@/components/recipe-details/recipeDetailsColors";
 import { SwapIngredientSheet } from "@/components/swap/SwapIngredientSheet";
 import { ArchieScreen } from "@/screens/ArchieScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
@@ -26,6 +27,7 @@ export default function AppShell() {
   const insets = useSafeAreaInsets();
   const onboardingCompleted = useAppStore((state) => state.onboardingCompleted);
   const activeTab = useAppStore((state) => state.activeTab);
+  const recipesView = useAppStore((state) => state.recipesView);
   const profileSheetVisible = useAppStore((state) => state.profileSheetVisible);
   const chatMessages = useAppStore((state) => state.chatMessages);
   const conversationStarted = chatMessages.length > 0;
@@ -34,8 +36,13 @@ export default function AppShell() {
     [insets.bottom]
   );
   const editingPreferences = activeTab === "profile" && profileSheetVisible;
+  const isRecipeDetail = activeTab === "recipes" && recipesView === "detail";
   const shellBackground =
-    activeTab === "profile" && !isDark ? PROFILE_COLORS.pageBackground : colors.background;
+    isRecipeDetail && !isDark
+      ? RECIPE_DETAILS_COLORS.background
+      : activeTab === "profile" && !isDark
+        ? PROFILE_COLORS.pageBackground
+        : colors.background;
 
   if (!onboardingCompleted) {
     return <OnboardingFlow />;

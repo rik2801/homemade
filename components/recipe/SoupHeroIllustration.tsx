@@ -16,18 +16,40 @@ const recipeLabels: Record<RecipeId, string> = {
 type SoupHeroIllustrationProps = {
   recipeId?: RecipeId;
   height?: number;
+  size?: number;
+  circular?: boolean;
+  accessibilityLabel?: string;
   style?: ViewStyle;
 };
 
 export function SoupHeroIllustration({
   recipeId = "creamy-tomato-soup",
   height = 180,
+  size,
+  circular = false,
+  accessibilityLabel,
   style
 }: SoupHeroIllustrationProps) {
+  const dimension = size ?? height;
+  const label = accessibilityLabel ?? recipeLabels[recipeId];
+
   return (
-    <View style={[styles.wrap, { height }, style]}>
+    <View
+      style={[
+        styles.wrap,
+        circular
+          ? {
+              width: dimension,
+              height: dimension,
+              borderRadius: dimension / 2
+            }
+          : { height: dimension, width: "100%" },
+        style
+      ]}
+    >
       <Image
-        accessibilityLabel={recipeLabels[recipeId]}
+        accessibilityRole="image"
+        accessibilityLabel={label}
         resizeMode="cover"
         source={recipeImages[recipeId]}
         style={styles.image}
@@ -38,8 +60,7 @@ export function SoupHeroIllustration({
 
 const styles = StyleSheet.create({
   wrap: {
-    overflow: "hidden",
-    width: "100%"
+    overflow: "hidden"
   },
   image: {
     height: "100%",

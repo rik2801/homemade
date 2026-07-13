@@ -5,6 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-na
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 import { ArchieMascotAvatar, TAB_MASCOT_SIZE } from "@/components/archie/ArchieMascotAvatar";
+import { RECIPE_DETAILS_COLORS } from "@/components/recipe-details/recipeDetailsColors";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
 import type { TabName } from "@/types/recipe";
@@ -132,6 +133,7 @@ export function BottomTabBar() {
   const { width: windowWidth } = useWindowDimensions();
   const { colors, isDark } = useAppTheme();
   const activeTab = useAppStore((state) => state.activeTab);
+  const recipesView = useAppStore((state) => state.recipesView);
   const returnTab = useAppStore((state) => state.returnTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
 
@@ -143,6 +145,9 @@ export function BottomTabBar() {
   const indicatorLeft = useSharedValue(indicatorLeftForIndex(markerIndex, tabWidth, islandWidth));
   const islandBackground = isDark ? colors.surface : "#FFFFFF";
   const inactiveIconColor = colors.text;
+  const isRecipeDetail = activeTab === "recipes" && recipesView === "detail";
+  const vignetteColor =
+    isRecipeDetail && !isDark ? RECIPE_DETAILS_COLORS.background : colors.background;
 
   useEffect(() => {
     if (activeTab === "archie") return;
@@ -176,7 +181,7 @@ export function BottomTabBar() {
         pointerEvents="none"
         style={[styles.vignetteShell, { height: vignetteHeight, width: windowWidth }]}
       >
-        <TabBarBottomVignette color={colors.background} height={vignetteHeight} width={windowWidth} />
+        <TabBarBottomVignette color={vignetteColor} height={vignetteHeight} width={windowWidth} />
       </View>
       <Animated.View
         pointerEvents="box-none"

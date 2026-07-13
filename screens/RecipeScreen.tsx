@@ -1,19 +1,18 @@
 import * as Haptics from "expo-haptics";
-import { useEffect, useRef } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useRef } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Path } from "react-native-svg";
-import { AppText } from "@/components/primitives/AppText";
 import { floatingTabBarScrollInset } from "@/components/layout/BottomTabBar";
-import { IngredientIcon } from "@/components/recipe/IngredientIcon";
-import { SoupHeroIllustration } from "@/components/recipe/SoupHeroIllustration";
-import type { RecipeId } from "@/features/recipe/data/homemadeRecipe";
-import { iconKeyForLabel } from "@/lib/swapFlow";
+import { IngredientsSection } from "@/components/recipe-details/IngredientsSection";
+import { NutritionSummary, getNutritionItems } from "@/components/recipe-details/NutritionSummary";
+import { PreparationSection } from "@/components/recipe-details/PreparationSection";
+import { RECIPE_DETAILS_COLORS } from "@/components/recipe-details/recipeDetailsColors";
+import { RecipeHero } from "@/components/recipe-details/RecipeHero";
+import type { IngredientDisplayItem } from "@/components/recipe-details/recipeDetails.types";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { iconKeyForLabel } from "@/lib/swapFlow";
 import { useAppStore } from "@/store/useAppStore";
 import type { SubstitutionRecord } from "@/types/recipe";
-import { fontFamily } from "@/theme/typography";
-import { layout, radius, spacing } from "@/theme/spacing";
 
 type RecipeScreenProps = {
   showBack?: boolean;
@@ -21,12 +20,11 @@ type RecipeScreenProps = {
 
 const EMPTY_SUBSTITUTIONS: Record<string, SubstitutionRecord> = {};
 
-export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
+export function RecipeScreen({ showBack: _showBack = false }: RecipeScreenProps) {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const recipe = useAppStore((state) => state.recipe);
-  const setRecipesView = useAppStore((state) => state.setRecipesView);
   const displaySteps = useAppStore((state) => state.displaySteps);
   const openSwapSheet = useAppStore((state) => state.openSwapSheet);
   const appliedSubstitutions = useAppStore(
@@ -36,10 +34,7 @@ export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
   const assistantContext = useAppStore((state) => state.assistantContext);
   const justAppliedId = useAppStore((state) => state.justAppliedId);
   const assistantPhase = useAppStore((state) => state.assistantPhase);
-  const chipTextColor = isDark ? "#FFFFFF" : colors.brandOnBrand;
-  const chipBackground = isDark ? "#3D3418" : colors.brandSoft;
-  const chipBorder = isDark ? colors.brand : colors.brandBorder;
-  const accentOnSurface = isDark ? colors.brand : colors.brandOnBrand;
+  const pageBackground = isDark ? colors.background : RECIPE_DETAILS_COLORS.background;
 
   useEffect(() => {
     if (justAppliedId) {
@@ -56,373 +51,78 @@ export function RecipeScreen({ showBack = false }: RecipeScreenProps) {
     openSwapSheet();
   }
 
-  async function handleBack() {
-    await Haptics.selectionAsync();
-    setRecipesView("list");
-  }
-
-  const swapEnabled = true;
-
-  return (
-    <ScrollView
-      ref={scrollRef}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={[
-        styles.content,
-        { paddingBottom: floatingTabBarScrollInset(insets.bottom) }
-      ]}
-      style={{ backgroundColor: colors.background }}
-    >
-      {showBack ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Back to recipes" onPress={handleBack} style={styles.backRow}>
-          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth={2}>
-            <Path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-          </Svg>
-          <AppText style={styles.backLabel}>All recipes</AppText>
-        </Pressable>
-      ) : null}
-
-      <View style={styles.hero}>
-        <AppText variant="title">{recipe.title}</AppText>
-        <AppText muted style={styles.subtitle}>
-          {recipe.subtitle}
-        </AppText>
-        <View style={styles.chips}>
-          {recipe.dietaryBadges.map((badge) => (
-            <View
-              key={badge}
-              style={[styles.chip, { borderColor: chipBorder, backgroundColor: chipBackground }]}
-            >
-              <AppText style={[styles.chipText, { color: chipTextColor }]}>{badge}</AppText>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={[styles.photoCard, { borderColor: colors.border }]}>
-        <SoupHeroIllustration recipeId={recipe.id as RecipeId} />
-        <View
-          style={[
-            styles.macros,
-            {
-              borderTopColor: colors.border,
-              backgroundColor: isDark ? colors.surface : "#FFFFFF"
-            }
-          ]}
-        >
-          <MacroItem label="Servings" value={String(recipe.servings)} isLast={false} />
-          {recipe.nutrition.macros.map((macro, index) => (
-            <MacroItem
-              key={macro.label}
-              label={macro.label}
-              value={macro.value}
-              isLast={index === recipe.nutrition.macros.length - 1}
-            />
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <View style={[styles.sectionHead, { borderBottomColor: colors.border }]}>
-          <AppText variant="section">Ingredients</AppText>
-          {swapEnabled ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Swap an ingredient"
-              onPress={handleSwapPress}
-              style={[styles.swapBtn, { borderColor: chipBorder, backgroundColor: colors.surface }]}
-            >
-              <Svg width={10} height={10} viewBox="0 0 24 24" stroke={accentOnSurface} fill="none" strokeWidth={2}>
-                <Path d="M16 3h5v5" />
-                <Path d="M4 20 21 3" />
-                <Path d="M21 16v5h-5" />
-                <Path d="M15 15 3 3" />
-              </Svg>
-              <AppText style={[styles.swapLabel, { color: accentOnSurface }]}>Swap</AppText>
-            </Pressable>
-          ) : (
-            <View style={styles.sectionSpacer} />
-          )}
-        </View>
-
-        <View style={styles.ingGrid}>
-          {recipe.ingredients.map((ingredient) => {
-            const sub = appliedSubstitutions[ingredient.id];
-            const isSelected =
-              assistantContext === "recipe" && selectedIngredientId === ingredient.id && !sub;
-            const isJustApplied = justAppliedId === ingredient.id;
-            const displayLabel = sub ? sub.currentItem : ingredient.label;
-            const displayAmount = sub ? sub.currentAmount : ingredient.amount;
-            const displayIcon = sub
-              ? iconKeyForLabel(sub.currentItem, ingredient.icon)
-              : ingredient.icon;
-
-            const isUpdated = Boolean(sub);
-            const isHighlighted = isSelected || isJustApplied || isUpdated;
-
-            return (
-              <View
-                key={ingredient.id}
-                style={[
-                  styles.ingRow,
-                  isHighlighted
-                    ? {
-                        backgroundColor: colors.brandSoft,
-                        borderColor: colors.brandBorder,
-                        borderWidth: 1.5,
-                        borderRadius: radius.md,
-                        padding: 4
-                      }
-                    : null
-                ]}
-              >
-                <IngredientIcon icon={displayIcon} showSwapDot={Boolean(sub)} />
-                <View style={styles.ingBody}>
-                  <View style={styles.ingTitleRow}>
-                    <AppText style={styles.ingName} numberOfLines={2}>
-                      {displayLabel}
-                    </AppText>
-                    {isUpdated ? (
-                      <View style={[styles.updatedBadge, { backgroundColor: colors.brand }]}>
-                        <AppText style={[styles.updatedText, { color: colors.brandOnBrand }]}>Updated</AppText>
-                      </View>
-                    ) : null}
-                  </View>
-                  <AppText style={[styles.ingAmt, { color: colors.faint }]}>{displayAmount}</AppText>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-
-      <View style={styles.sectionPrep}>
-        <View style={[styles.sectionHead, { borderBottomColor: colors.border }]}>
-          <AppText variant="section">Preparation</AppText>
-          <View style={styles.sectionSpacer} />
-        </View>
-        <View style={styles.steps}>
-          {displaySteps.map((step, index) => {
-            const isChanged = Boolean(justAppliedId) && step !== recipe.steps[index];
-
-            return (
-              <View
-                key={`${index}-${step}`}
-                style={[
-                  styles.stepRow,
-                  isChanged
-                    ? {
-                        backgroundColor: colors.brandSoft,
-                        borderRadius: radius.md,
-                        marginHorizontal: -4,
-                        paddingHorizontal: 4
-                      }
-                    : null
-                ]}
-              >
-                <AppText style={[styles.stepNum, { color: colors.faint }]}>{index + 1}</AppText>
-                <AppText style={[styles.stepText, { color: isDark ? "#FFFFFF" : colors.muted }]}>{step}</AppText>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-    </ScrollView>
+  const nutritionItems = useMemo(
+    () => getNutritionItems(recipe.servings, recipe.nutrition.macros),
+    [recipe.nutrition.macros, recipe.servings]
   );
-}
 
-function MacroItem({ label, value, isLast }: { label: string; value: string; isLast: boolean }) {
-  const { colors } = useAppTheme();
+  const ingredientItems = useMemo((): IngredientDisplayItem[] => {
+    return recipe.ingredients.map((ingredient) => {
+      const sub = appliedSubstitutions[ingredient.id];
+      const isSelected =
+        assistantContext === "recipe" && selectedIngredientId === ingredient.id && !sub;
+      const isJustApplied = justAppliedId === ingredient.id;
+      const isUpdated = Boolean(sub);
+
+      return {
+        id: ingredient.id,
+        label: sub ? sub.currentItem : ingredient.label,
+        amount: sub ? sub.currentAmount : ingredient.amount,
+        icon: sub ? iconKeyForLabel(sub.currentItem, ingredient.icon) : ingredient.icon,
+        isUpdated,
+        isHighlighted: isSelected || isJustApplied || isUpdated,
+        showSwapDot: isUpdated
+      };
+    });
+  }, [
+    appliedSubstitutions,
+    assistantContext,
+    justAppliedId,
+    recipe.ingredients,
+    selectedIngredientId
+  ]);
+
   return (
-    <View style={[styles.macro, !isLast ? { borderRightColor: colors.borderLight, borderRightWidth: StyleSheet.hairlineWidth } : null]}>
-      <AppText style={[styles.macroVal, { color: colors.text }]}>{value}</AppText>
-      <AppText style={[styles.macroLbl, { color: colors.faint }]}>{label.toUpperCase()}</AppText>
+    <View style={[styles.screen, { backgroundColor: pageBackground }]}>
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: floatingTabBarScrollInset(insets.bottom) + 32 }
+        ]}
+        style={{ backgroundColor: pageBackground }}
+      >
+        <RecipeHero
+          title={recipe.title}
+          subtitle={recipe.subtitle}
+          dietaryBadges={recipe.dietaryBadges}
+          recipeId={recipe.id}
+        />
+
+        <NutritionSummary items={nutritionItems} />
+
+        <IngredientsSection
+          ingredients={ingredientItems}
+          onSwapPress={handleSwapPress}
+          swapDisabled={assistantPhase === "loading"}
+        />
+
+        <PreparationSection
+          steps={displaySteps}
+          originalSteps={recipe.steps}
+          justAppliedId={justAppliedId}
+        />
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: layout.screenPadding
+  screen: {
+    flex: 1
   },
-  backRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 6,
-    marginBottom: spacing.sm,
-    paddingTop: spacing.sm
-  },
-  backLabel: {
-    fontFamily,
-    fontSize: 14,
-    fontWeight: "500"
-  },
-  hero: {
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-    paddingTop: 15
-  },
-  subtitle: {
-    fontFamily,
-    fontSize: 14,
-    lineHeight: 20
-  },
-  chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6
-  },
-  chip: {
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5
-  },
-  chipText: {
-    fontFamily,
-    fontSize: 10,
-    fontWeight: "500"
-  },
-  photoCard: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    overflow: "hidden"
-  },
-  macros: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    paddingBottom: 11,
-    paddingHorizontal: 4,
-    paddingTop: 10
-  },
-  macro: {
-    alignItems: "center",
-    flex: 1,
-    minWidth: 0,
-    paddingHorizontal: 4
-  },
-  macroVal: {
-    fontFamily,
-    fontSize: 14,
-    fontWeight: "400",
-    letterSpacing: -0.3,
-    lineHeight: 16
-  },
-  macroLbl: {
-    fontFamily,
-    fontSize: 10,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-    lineHeight: 12,
-    marginTop: 3,
-    textTransform: "uppercase"
-  },
-  section: {
-    marginTop: spacing.xxl
-  },
-  sectionPrep: {
-    marginBottom: spacing.sm,
-    marginTop: spacing.xxl
-  },
-  sectionHead: {
-    alignItems: "center",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 14,
-    minHeight: 44,
-    paddingBottom: 12
-  },
-  sectionSpacer: {
-    width: 26
-  },
-  swapBtn: {
-    alignItems: "center",
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 5,
-    height: 28,
-    justifyContent: "center",
-    paddingHorizontal: 10
-  },
-  swapLabel: {
-    fontFamily,
-    fontSize: 11,
-    fontWeight: "600"
-  },
-  ingGrid: {
-    columnGap: 10,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    rowGap: 4
-  },
-  ingRow: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: 7,
-    paddingHorizontal: 4,
-    paddingVertical: 6,
-    width: "48.5%"
-  },
-  ingBody: {
-    flex: 1,
-    gap: 1,
-    minWidth: 0
-  },
-  ingTitleRow: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4
-  },
-  updatedBadge: {
-    borderRadius: radius.pill,
-    paddingHorizontal: 6,
-    paddingVertical: 2
-  },
-  updatedText: {
-    fontFamily,
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-    textTransform: "uppercase"
-  },
-  ingName: {
-    fontFamily,
-    fontSize: 12,
-    fontWeight: "500",
-    letterSpacing: -0.1,
-    lineHeight: 16
-  },
-  ingAmt: {
-    fontFamily,
-    fontSize: 11,
-    lineHeight: 13,
-    marginTop: 1
-  },
-  steps: {
-    paddingBottom: spacing.sm
-  },
-  stepRow: {
-    flexDirection: "row",
-    paddingBottom: 10,
-    paddingLeft: 22,
-    paddingTop: 10,
-    position: "relative"
-  },
-  stepNum: {
-    fontFamily,
-    fontSize: 12,
-    fontWeight: "600",
-    left: 0,
-    position: "absolute",
-    top: 10
-  },
-  stepText: {
-    flex: 1,
-    fontFamily,
-    fontSize: 15,
-    lineHeight: 23
+  scrollContent: {
+    flexGrow: 1
   }
 });

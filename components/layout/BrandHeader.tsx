@@ -7,6 +7,7 @@ import { HomemadeLogo } from "@/components/brand/HomemadeLogo";
 import { AppText } from "@/components/primitives/AppText";
 import { SettingsGearIcon } from "@/components/profile/ProfileIcons";
 import { PROFILE_COLORS } from "@/components/profile/profileColors";
+import { RECIPE_DETAILS_COLORS } from "@/components/recipe-details/recipeDetailsColors";
 import { preferenceEditTitle } from "@/screens/PreferenceEditScreen";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppStore } from "@/store/useAppStore";
@@ -35,6 +36,8 @@ export function BrandHeader() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useAppTheme();
   const activeTab = useAppStore((state) => state.activeTab);
+  const recipesView = useAppStore((state) => state.recipesView);
+  const setRecipesView = useAppStore((state) => state.setRecipesView);
   const exitArchie = useAppStore((state) => state.exitArchie);
   const openArchieSidebar = useAppStore((state) => state.openArchieSidebar);
   const openArchSheet = useAppStore((state) => state.openArchSheet);
@@ -44,19 +47,27 @@ export function BrandHeader() {
   const isArchie = activeTab === "archie";
   const isProfile = activeTab === "profile";
   const isPreferenceEdit = isProfile && profileSheetVisible;
+  const isRecipeDetail = activeTab === "recipes" && recipesView === "detail";
   const chatMessages = useAppStore((state) => state.chatMessages);
   const archieConversationStarted = chatMessages.length > 0;
   const archieIconColor =
     archieConversationStarted && isDark ? "#FFFFFF" : "#111827";
   const headerBackground = isArchie
     ? "transparent"
-    : (isProfile || isPreferenceEdit) && !isDark
-      ? PROFILE_COLORS.pageBackground
-      : colors.background;
+    : isRecipeDetail && !isDark
+      ? RECIPE_DETAILS_COLORS.background
+      : (isProfile || isPreferenceEdit) && !isDark
+        ? PROFILE_COLORS.pageBackground
+        : colors.background;
 
   async function handleBack() {
     await Haptics.selectionAsync();
     exitArchie();
+  }
+
+  async function handleRecipeBack() {
+    await Haptics.selectionAsync();
+    setRecipesView("list");
   }
 
   async function handleOpenChats() {
@@ -81,7 +92,8 @@ export function BrandHeader() {
         {
           paddingTop: insets.top + layout.headerPaddingTop,
           backgroundColor: headerBackground
-        }
+        },
+        isRecipeDetail ? styles.recipeDetailHeader : null
       ]}
     >
       {isArchie ? (
@@ -139,6 +151,34 @@ export function BrandHeader() {
           >
             <SettingsGearIcon color={isDark ? colors.text : PROFILE_COLORS.brandGreen} />
           </Pressable>
+        </View>
+      ) : isRecipeDetail ? (
+        <View style={styles.recipeDetailBar}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Go back to all recipes"
+            hitSlop={4}
+            onPress={handleRecipeBack}
+            style={({ pressed }) => [
+              styles.recipeBackButton,
+              { opacity: pressed ? 0.72 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }
+            ]}
+          >
+            <ChevronLeft color={isDark ? colors.text : RECIPE_DETAILS_COLORS.textPrimary} />
+            <AppText
+              style={[
+                styles.recipeBackLabel,
+                { color: isDark ? colors.text : RECIPE_DETAILS_COLORS.textPrimary }
+              ]}
+            >
+              All recipes
+            </AppText>
+          </Pressable>
+          <View pointerEvents="none" style={styles.logoOverlay}>
+            <HomemadeLogo align="center" height={28} />
+          </View>
+          {/* Favorite/Share omitted — actions not present in the app yet. */}
+          <View style={styles.recipeRightSpacer} />
         </View>
       ) : (
         <HomemadeLogo align="center" height={36} />
@@ -207,5 +247,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "400",
     letterSpacing: -0.2
+  },
+  recipeDetailHeader: {
+    paddingBottom: 4
+  },
+  recipeDetailBar: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 56,
+    position: "relative",
+    width: "100%"
+  },
+  recipeBackButton: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
+    minHeight: 44,
+    minWidth: 44,
+    paddingRight: 8,
+    zIndex: 1
+  },
+  recipeBackLabel: {
+    fontFamily,
+    fontSize: 14,
+    fontWeight: "500",
+    letterSpacing: -0.2
+  },
+  recipeRightSpacer: {
+    minWidth: 44,
+    minHeight: 44,
+    zIndex: 1
   }
 });

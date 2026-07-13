@@ -98,9 +98,21 @@ type IngredientIconProps = {
 };
 
 export function IngredientIcon({ icon, size = 24, showSwapDot }: IngredientIconProps) {
+  const borderRadius = Math.max(7, Math.round(size * 0.32));
+
   return (
     <View style={styles.wrap}>
-      <View style={[styles.thumb, { width: size, height: size, backgroundColor: thumbColors[icon] }]}>
+      <View
+        style={[
+          styles.thumb,
+          {
+            width: size,
+            height: size,
+            borderRadius,
+            backgroundColor: thumbColors[icon]
+          }
+        ]}
+      >
         <IconSvg type={icon} />
       </View>
       {showSwapDot ? <View style={styles.dot} /> : null}
@@ -114,7 +126,6 @@ const styles = StyleSheet.create({
   },
   thumb: {
     alignItems: "center",
-    borderRadius: 7,
     justifyContent: "center",
     overflow: "hidden"
   },
