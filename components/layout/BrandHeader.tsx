@@ -157,7 +157,7 @@ export function BrandHeader() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Go back to all recipes"
-            hitSlop={4}
+            hitSlop={8}
             onPress={handleRecipeBack}
             style={({ pressed }) => [
               styles.recipeBackButton,
@@ -165,20 +165,7 @@ export function BrandHeader() {
             ]}
           >
             <ChevronLeft color={isDark ? colors.text : RECIPE_DETAILS_COLORS.textPrimary} />
-            <AppText
-              style={[
-                styles.recipeBackLabel,
-                { color: isDark ? colors.text : RECIPE_DETAILS_COLORS.textPrimary }
-              ]}
-            >
-              All recipes
-            </AppText>
           </Pressable>
-          <View pointerEvents="none" style={styles.logoOverlay}>
-            <HomemadeLogo align="center" height={28} />
-          </View>
-          {/* Favorite/Share omitted — actions not present in the app yet. */}
-          <View style={styles.recipeRightSpacer} />
         </View>
       ) : (
         <HomemadeLogo align="center" height={36} />
@@ -254,29 +241,14 @@ const styles = StyleSheet.create({
   recipeDetailBar: {
     alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 56,
-    position: "relative",
+    justifyContent: "flex-start",
+    minHeight: 44,
     width: "100%"
   },
   recipeBackButton: {
     alignItems: "center",
-    flexDirection: "row",
-    gap: 4,
-    minHeight: 44,
-    minWidth: 44,
-    paddingRight: 8,
-    zIndex: 1
-  },
-  recipeBackLabel: {
-    fontFamily,
-    fontSize: 14,
-    fontWeight: "500",
-    letterSpacing: -0.2
-  },
-  recipeRightSpacer: {
-    minWidth: 44,
-    minHeight: 44,
-    zIndex: 1
+    justifyContent: "center",
+    height: 44,
+    width: 44
   }
 });

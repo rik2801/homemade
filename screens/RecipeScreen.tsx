@@ -98,6 +98,7 @@ export function RecipeScreen({ showBack: _showBack = false }: RecipeScreenProps)
           subtitle={recipe.subtitle}
           dietaryBadges={recipe.dietaryBadges}
           recipeId={recipe.id}
+          cookTime={recipe.cookTime}
         />
 
         <NutritionSummary items={nutritionItems} />

@@ -50,6 +50,7 @@ export type RecipeHeroProps = {
   subtitle: string;
   dietaryBadges: DietaryBadge[];
   recipeId: string;
+  cookTime: string;
 };
 
 export type { SubstitutionRecord };

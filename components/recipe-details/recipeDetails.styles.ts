@@ -59,9 +59,9 @@ export const recipeDetailsStyles = StyleSheet.create({
     marginTop: 12
   },
   badge: {
-    backgroundColor: c.accentSoft,
+    backgroundColor: "transparent",
     borderColor: c.accentBorder,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 3

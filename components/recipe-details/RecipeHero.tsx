@@ -3,10 +3,17 @@ import { AppText } from "@/components/primitives/AppText";
 import { SoupHeroIllustration } from "@/components/recipe/SoupHeroIllustration";
 import type { RecipeId } from "@/features/recipe/data/homemadeRecipe";
 import { DietaryBadges } from "./DietaryBadges";
+import { RecipeTimerButton } from "./RecipeTimerButton";
 import { recipeDetailsStyles as styles } from "./recipeDetails.styles";
 import type { RecipeHeroProps } from "./recipeDetails.types";
 
-export function RecipeHero({ title, subtitle, dietaryBadges, recipeId }: RecipeHeroProps) {
+export function RecipeHero({
+  title,
+  subtitle,
+  dietaryBadges,
+  recipeId,
+  cookTime
+}: RecipeHeroProps) {
   const { width } = useWindowDimensions();
   const isCompact = width < 375;
   const imageSize = Math.min(isCompact ? width * 0.48 : width * 0.52, 220);
@@ -25,6 +32,7 @@ export function RecipeHero({ title, subtitle, dietaryBadges, recipeId }: RecipeH
         </AppText>
         <AppText style={styles.subtitle}>{subtitle}</AppText>
         <DietaryBadges badges={dietaryBadges} />
+        <RecipeTimerButton cookTime={cookTime} recipeTitle={title} />
       </View>
 
       <View style={styles.heroImageColumn}>
